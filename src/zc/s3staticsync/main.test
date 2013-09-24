@@ -3,19 +3,41 @@ S3static sync tests
 
 We have a same directory and a test bucket (in a faux s3).
 
-    >>> import os
+    >>> import os, mock
     >>> os.mkdir('sample')
-    >>> mkfile('sample/f1')
-    >>> mkfile('sample/d1/f1')
-    >>> mkfile('sample/d1/d2/f1')
-    >>> mkfile('sample/f2')
-    >>> mkfile('sample/d1/f2')
-    >>> mkfile('sample/d1/d2/f2')
+    >>> t = 1379885832.0
+    >>> with mock.patch('time.time', return_value=t):
+    ...     mkfile('sample/f1')
+    ...     mkfile('sample/d1/f1')
+    ...     mkfile('sample/d1/d2/f1')
+    ...     mkfile('sample/f2')
+    ...     mkfile('sample/d1/f2')
+    ...     mkfile('sample/d1/d2/f2')
 
-Now, we'll sync to our faux bucket:
+Cuz we're mean, we'll create a broken symlink:
+
+    >>> os.symlink('lose', 'sample/d1/hahaha')
+
+Later:
+
+    >>> t += 3600
+
+We'll sync to our faux bucket:
 
     >>> import zc.s3staticsync
-    >>> zc.s3staticsync.main([os.path.abspath('sample'), 'test'])
+
+    >>> t += 30
+    >>> with mock.patch('time.time', return_value=t):
+    ...    zc.s3staticsync.main([os.path.abspath('sample'), 'test'])
+    ... # doctest: +ELLIPSIS
+    bad file 'd1/hahaha'
+    Traceback (most recent call last):
+    ...
+    OSError: [Errno 2] No such file or directory: '.../sample/d1/hahaha'
+
+Note that we logged an exception for the bad link, but we kept going.
+
+    >>> os.remove('sample/d1/hahaha')
 
 Let's check what we have in our bucket:
 
@@ -33,26 +55,69 @@ Let's check what we have in our bucket:
     f1
     f2
 
-Let's make some changes and make sure they're reflected:
+We did 6 puts and no deletes:
 
-    >>> import time; time.sleep(1)
-    >>> mkfile('sample/f1')
-    >>> mkfile('sample/d1/f1')
-    >>> mkfile('sample/d1/d2/f1')
-    >>> mkfile('sample/f3')
-    >>> mkfile('sample/d1/f3')
-    >>> mkfile('sample/d1/d2/f3')
+    >>> bucket.puts, bucket.deletes
+    (6, 0)
+
+Time passes and we so it all again:
+
+    >>> t += 1800
+    >>> with mock.patch('time.time', return_value=t):
+    ...    zc.s3staticsync.main([os.path.abspath('sample'), 'test'])
+
+Nothing should have been put or deleted:
+
+    >>> bucket.puts, bucket.deletes
+    (6, 0)
+
+
+ Let's make some changes and make sure they're reflected:
+
+    >>> t += 1000
+    >>> with mock.patch('time.time', return_value=t):
+    ...     mkfile('sample/d1/d2/f1')
+    ...     mkfile('sample/f3')
+    ...     mkfile('sample/d1/f3')
+    ...     mkfile('sample/d1/d2/f3')
+
     >>> os.remove('sample/f2')
     >>> os.remove('sample/d1/f2')
     >>> os.remove('sample/d1/d2/f2')
 
-    >>> zc.s3staticsync.main([os.path.abspath('sample'), 'test'])
-    >>> for k in bucket:
-    ...     print k.key
-    ...     k.check('sample')
-    d1/d2/f1
-    d1/d2/f3
-    d1/f1
-    d1/f3
-    f1
-    f3
+
+     >>> with mock.patch('time.time', return_value=t+800):
+     ...    zc.s3staticsync.main([os.path.abspath('sample'), 'test'])
+
+     >>> for k in bucket:
+     ...     print k.key
+     ...     k.check('sample')
+     d1/d2/f1
+     d1/d2/f3
+     d1/f1
+     d1/f3
+     f1
+     f3
+
+     >>> bucket.puts, bucket.deletes
+     (10, 3)
+
+There's a kinda weird case.  We compare file modification time to s3
+modification time. To account for that, and for clocks being out of
+sync, we add a fudge factor to the modification time. This causes
+newly modified files to be uploaded twice:
+
+    >>> t += 1800
+    >>> with mock.patch('time.time', return_value=t):
+    ...    zc.s3staticsync.main([os.path.abspath('sample'), 'test'])
+    >>> bucket.puts, bucket.deletes
+    (14, 3)
+
+But only twice:
+
+    >>> t += 1800
+    >>> with mock.patch('time.time', return_value=t):
+    ...    zc.s3staticsync.main([os.path.abspath('sample'), 'test'])
+    >>> bucket.puts, bucket.deletes
+    (14, 3)
+

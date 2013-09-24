@@ -1,12 +1,24 @@
+""" usage: %prog [options] srcdir bucket
+"""
+
 import boto.s3.connection
 import boto.s3.key
+import email.utils
 import logging
+import optparse
 import os
 import Queue
 import sys
 import threading
+import time
+
+parser = optparse.OptionParser(usage=__doc__)
+parser.add_option('-w', '--worker-threads', type='int', default=9)
+parser.add_option('-f', '--clock-fudge-factor', type='int', default=1200)
 
 logger = logging.getLogger(__name__)
+
+DELETE, PUT = 'dp'
 
 def thread(func, *args):
     t = threading.Thread(target=func, args=args)
@@ -14,22 +26,36 @@ def thread(func, *args):
     t.start()
     return t
 
+# Sigh, time.  S3 stores mod time in rfc 1123 format.  We can use
+# email.utils to get a time tuple, in UTC.  We need to convert it to
+# something we can compate to an of.stat(f).st_mtime and something we
+# can store effeciently, because we'll end up having a lot of them in
+# memory.
+
+# Computing gmt mtimes from timetuples is kind of exciting. :( We'll
+# get gmt-sixtuples and convery them to time values by ignoring DST.
+# Basically, we don't care whether time times are accurate, but only
+# that, if they're wrong, they're wrong by the same abount.
+
+zeros = 0, 0, 0
+def time_time_from_sixtuple(tup):
+    return int(time.mktime(tup[:6]+zeros))
+
 def worker(queue, base_path, bucket):
     while 1:
         try:
-            mtime, path = queue.get()
+            op, path = queue.get()
             if path is None:
                 return
             key = boto.s3.key.Key(bucket)
             key.key = path
-            if mtime == None:
+            if op == DELETE:
                 key.delete()
             else:
                 path = os.path.join(base_path, path)
-                key.set_metadata('mtime', mtime)
                 key.set_contents_from_filename(path)
         except Exception:
-            logger.exception('processing %r %r' % (mtime, path))
+            logger.exception('processing %r %r' % (op, path))
         finally:
             queue.task_done()
 
@@ -37,6 +63,9 @@ def main(args=None):
     if args == None:
         args = sys.argv[1:]
         logging.basicConfig()
+
+    options, args = parser.parse_args(args)
+    fudge = options.clock_fudge_factor
 
     path, bucket_name = args
 
@@ -59,12 +88,23 @@ def main(args=None):
             if os.path.isdir(pname):
                 listfs(pname, rname)
             else:
-                mtime = int(os.stat(pname).st_mtime)
+                try:
+                    mtime = time_time_from_sixtuple(
+                        time.gmtime(os.stat(pname).st_mtime))
+                except OSError:
+                    logger.exception("bad file %r" % rname)
+                    continue
+
+                # add a fudge factor to account for crappy clocks and bias
+                # caused by delat between start of upload and
+                # computation of last_modified.
+                mtime += fudge
+
                 if rname in s3:
                     # We can go ahead and do the check
                     s3mtime = s3.pop(rname)
                     if mtime > s3mtime:
-                        put((mtime, rname))
+                        put((PUT, rname))
                 else:
                     fs[rname] = mtime
 
@@ -76,28 +116,29 @@ def main(args=None):
     @thread
     def s3_thread():
         for key in bucket:
-            s3mtime = int(key.get_metadata('mtime') or 0)
+            s3mtime = time_time_from_sixtuple(
+                email.utils.parsedate(key.last_modified))
             path = key.key
             if path in fs:
                 mtime = fs.pop(path)
                 if mtime > s3mtime:
-                    put((mtime, path))
+                    put((PUT, path))
             else:
                 s3[path] = s3mtime
 
-    nthreads = 19 # TODO: get from arg
     workers = [thread(worker, queue, path, bucket)
-               for i in range(nthreads)]
+               for i in range(options.worker_threads)]
 
     fs_thread.join()
     s3_thread.join()
 
     for (path, mtime) in fs.iteritems():
-        if mtime > s3.pop(path, 0):
-            put((mtime, path))
+        s3mtime = s3.pop(path, 0)
+        if mtime > s3mtime:
+            put((PUT, path))
 
     for path in s3:
-        put((None, path))
+        put((DELETE, path))
 
     queue.join()
 
