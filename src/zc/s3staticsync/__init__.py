@@ -3,7 +3,6 @@
 
 import boto.s3.connection
 import boto.s3.key
-import email.utils
 import logging
 import optparse
 import os
@@ -26,9 +25,9 @@ def thread(func, *args):
     t.start()
     return t
 
-# Sigh, time.  S3 stores mod time in rfc 1123 format.  We can use
-# email.utils to get a time tuple, in UTC.  We need to convert it to
-# something we can compate to an of.stat(f).st_mtime and something we
+# Sigh, time.  When iterating, boto returns S3 object modification
+# times like this: u'2013-09-24T18:08:20.000Z'. We need to convert it to
+# something we can compare to an of.stat(f).st_mtime and something we
 # can store effeciently, because we'll end up having a lot of them in
 # memory.
 
@@ -36,6 +35,10 @@ def thread(func, *args):
 # get gmt-sixtuples and convery them to time values by ignoring DST.
 # Basically, we don't care whether time times are accurate, but only
 # that, if they're wrong, they're wrong by the same abount.
+
+def parse_time(s):
+    date, time = s.split('.')[0].split('T')
+    return tuple(int(x) for x in (date.split('-')+time.split(':')))
 
 zeros = 0, 0, 0
 def time_time_from_sixtuple(tup):
@@ -116,8 +119,7 @@ def main(args=None):
     @thread
     def s3_thread():
         for key in bucket:
-            s3mtime = time_time_from_sixtuple(
-                email.utils.parsedate(key.last_modified))
+            s3mtime = time_time_from_sixtuple(parse_time(key.last_modified))
             path = key.key
             if path in fs:
                 mtime = fs.pop(path)

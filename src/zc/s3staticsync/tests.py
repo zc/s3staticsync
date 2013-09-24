@@ -12,7 +12,6 @@
 #
 ##############################################################################
 import doctest
-import email.utils
 import mock
 import os
 import time
@@ -41,7 +40,10 @@ class Key:
         self.bucket = bucket
 
     def set_contents_from_filename(self, filename):
-        self.last_modified = email.utils.formatdate(time.time())
+        self.last_modified = (
+            "%4.4d-%2.2d-%2.2dT%2.2d:%2.2d:%2.2d.123"
+            % time.gmtime(time.time())[:6]
+            )
         with open(filename) as f:
             self.bucket.data[self.key] = (
                 f.read(), self.last_modified)
