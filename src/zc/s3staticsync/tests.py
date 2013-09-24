@@ -11,15 +11,18 @@
 # FOR A PARTICULAR PURPOSE.
 #
 ##############################################################################
-
 import doctest
 import mock
 import os
+import time
 import traceback
 import random
+import sys
 import zope.testing.setupstack
 
 class Bucket:
+
+    puts = deletes = 0
 
     def __init__(self):
         self.data = {}
@@ -28,24 +31,24 @@ class Bucket:
         for path in sorted(self.data):
             k = Key(self)
             k.key = path
-            k.data, k.metadata = self.data[path]
+            k.data, k.last_modified = self.data[path]
             yield k
 
 class Key:
 
     def __init__(self, bucket):
         self.bucket = bucket
-        self.metadata = {}
-
-    def set_metadata(self, k, v):
-        self.metadata[k] = unicode(v)
-
-    def get_metadata(self, k):
-        return self.metadata.get(k)
 
     def set_contents_from_filename(self, filename):
+        self.last_modified = (
+            "%4.4d-%2.2d-%2.2dT%2.2d:%2.2d:%2.2d.123"
+            % time.gmtime(time.time())[:6]
+            )
         with open(filename) as f:
-            self.bucket.data[self.key] = f.read(), self.metadata
+            self.bucket.data[self.key] = (
+                f.read(), self.last_modified)
+
+        self.bucket.puts += 1
 
     def check(self, base):
         with open(os.path.join(base, self.key)) as f:
@@ -54,6 +57,7 @@ class Key:
 
     def delete(self):
         del self.bucket.data[self.key]
+        self.bucket.deletes += 1
 
 class S3Connection:
 
@@ -70,10 +74,11 @@ def mkfile(path):
     with open(path, 'w') as f:
         f.write(''.join(chr(random.randint(0,255))
                         for i in range(random.randint(0, 1<<16))))
+    os.utime(path, (time.time(), time.time()))
 
 def exception(s):
     print s
-    traceback.print_exc()
+    traceback.print_exc(file=sys.stdout)
 
 def setup(test):
     zope.testing.setupstack.setUpDirectory(test)
