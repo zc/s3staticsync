@@ -14,6 +14,7 @@ import time
 parser = optparse.OptionParser(usage=__doc__)
 parser.add_option('-w', '--worker-threads', type='int', default=9)
 parser.add_option('-f', '--clock-fudge-factor', type='int', default=1200)
+parser.add_option('-e', '--file-system-encoding', default='latin-1')
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +70,7 @@ def main(args=None):
 
     options, args = parser.parse_args(args)
     fudge = options.clock_fudge_factor
+    encoding = options.file_system_encoding
 
     path, bucket_name = args
 
@@ -103,13 +105,14 @@ def main(args=None):
                 # computation of last_modified.
                 mtime += fudge
 
-                if rname in s3:
+                key = rname.decode(encoding)
+                if key in s3:
                     # We can go ahead and do the check
-                    s3mtime = s3.pop(rname)
+                    s3mtime = s3.pop(key)
                     if mtime > s3mtime:
-                        put((PUT, rname))
+                        put((PUT, key))
                 else:
-                    fs[rname] = mtime
+                    fs[key] = mtime
 
     fs_thread = thread(listfs, path, '')
 

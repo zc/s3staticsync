@@ -56,10 +56,12 @@ Note on AWS keys
 Changes
 *******
 
-0.1.0 (2013-09-21)
+0.3.0 (2013-09-25)
 ==================
 
-Initial release
+Decode file paths using the configured encoding, which defaults to
+latin-1.
+
 
 0.2.0 (2013-09-24)
 ==================
@@ -71,3 +73,8 @@ the original mtimes (which has a race condition the way we did it
 anyway).  Instead, we now compare file-system modification times with
 S3 object modification times, using a fudge factor to account for the
 fact that they're not computed the same way, and for clock skew.
+
+0.1.0 (2013-09-21)
+==================
+
+Initial release
