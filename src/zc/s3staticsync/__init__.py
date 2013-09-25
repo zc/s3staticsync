@@ -45,24 +45,6 @@ zeros = 0, 0, 0
 def time_time_from_sixtuple(tup):
     return int(time.mktime(tup[:6]+zeros))
 
-def worker(queue, base_path, bucket):
-    while 1:
-        try:
-            op, path = queue.get()
-            if path is None:
-                return
-            key = boto.s3.key.Key(bucket)
-            key.key = path
-            if op == DELETE:
-                key.delete()
-            else:
-                path = os.path.join(base_path, path)
-                key.set_contents_from_filename(path)
-        except Exception:
-            logger.exception('processing %r %r' % (op, path))
-        finally:
-            queue.task_done()
-
 def main(args=None):
     if args == None:
         args = sys.argv[1:]
@@ -131,7 +113,25 @@ def main(args=None):
             else:
                 s3[path] = s3mtime
 
-    workers = [thread(worker, queue, path, bucket)
+    def worker(base_path):
+        while 1:
+            try:
+                op, path = queue.get()
+                if path is None:
+                    return
+                key = boto.s3.key.Key(bucket)
+                key.key = path
+                if op == DELETE:
+                    key.delete()
+                else:
+                    path = os.path.join(base_path, path)
+                    key.set_contents_from_filename(path.encode(encoding))
+            except Exception:
+                logger.exception('processing %r %r' % (op, path))
+            finally:
+                queue.task_done()
+
+    workers = [thread(worker, path)
                for i in range(options.worker_threads)]
 
     fs_thread.join()

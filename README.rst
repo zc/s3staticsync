@@ -56,12 +56,19 @@ Note on AWS keys
 Changes
 *******
 
+0.4.0 (2013-09-25)
+==================
+
+Fix: needed to use encoded file names when reading data from file
+     system.  (We were storing them decoded and boto was using a
+     different encoding when trying to read them.)
+
+
 0.3.0 (2013-09-25)
 ==================
 
 Decode file paths using the configured encoding, which defaults to
 latin-1.
-
 
 0.2.0 (2013-09-24)
 ==================
