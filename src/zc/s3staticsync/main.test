@@ -86,21 +86,21 @@ Nothing should have been put or deleted:
     >>> os.remove('sample/d1/d2/f2')
 
 
-     >>> with mock.patch('time.time', return_value=t+800):
-     ...    zc.s3staticsync.main([os.path.abspath('sample'), 'test'])
+    >>> with mock.patch('time.time', return_value=t+800):
+    ...    zc.s3staticsync.main([os.path.abspath('sample'), 'test'])
 
-     >>> for k in bucket:
-     ...     print k.key
-     ...     k.check('sample')
-     d1/d2/f1
-     d1/d2/f3
-     d1/f1
-     d1/f3
-     f1
-     f3
+    >>> for k in bucket:
+    ...     print k.key
+    ...     k.check('sample')
+    d1/d2/f1
+    d1/d2/f3
+    d1/f1
+    d1/f3
+    f1
+    f3
 
-     >>> bucket.puts, bucket.deletes
-     (10, 3)
+    >>> bucket.puts, bucket.deletes
+    (10, 3)
 
 There's a kinda weird case.  We compare file modification time to s3
 modification time. To account for that, and for clocks being out of
@@ -121,3 +121,67 @@ But only twice:
     >>> bucket.puts, bucket.deletes
     (14, 3)
 
+Emptying a bucket
+=================
+
+An easy way to empty a bucket is to sync from an empty directory. :)
+
+    >>> os.mkdir('empty')
+    >>> zc.s3staticsync.main(['empty', 'test'])
+    >>> list(bucket)
+    []
+
+Prefix duplication
+==================
+
+Sometimes, if you've been very bad, you may need to duplicate keys.
+In a web server, you might hace rules to rewrite URLs.
+
+You can provide some prefix pairs on the command line. When adding or
+removing keys, you can add and remove duplicate paths starting with a
+given prefix to another prefix.
+
+    >>> with mock.patch('time.time', return_value=t):
+    ...    zc.s3staticsync.main(
+    ...       [os.path.abspath('sample'), 'test',
+    ...       '=dup/', '=dup2/', 'd1/d2/=d2/',
+    ...       ])
+
+Here we duplicated everything to dup1 and dup2, and
+duplicates everything in d1/d2 to a top level d2 directory.
+
+    >>> for k in bucket:
+    ...     print k.key
+    d1/d2/f1
+    d1/d2/f3
+    d1/f1
+    d1/f3
+    d2/f1
+    d2/f3
+    dup/d1/d2/f1
+    dup/d1/d2/f3
+    dup/d1/f1
+    dup/d1/f3
+    dup/f1
+    dup/f3
+    dup2/d1/d2/f1
+    dup2/d1/d2/f3
+    dup2/d1/f1
+    dup2/d1/f3
+    dup2/f1
+    dup2/f3
+    f1
+    f3
+
+    >>> for k in bucket.list('dup/'):
+    ...     k.check('sample', 'dup/')
+
+    >>> for k in bucket.list('dup2/'):
+    ...     k.check('sample', 'dup2/')
+
+    >>> for k in bucket.list('d1/'):
+    ...     k.check('sample')
+
+    >>> zc.s3staticsync.main(['empty', 'test'])
+    >>> list(bucket)
+    []

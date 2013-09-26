@@ -24,15 +24,19 @@ class Bucket:
 
     puts = deletes = 0
 
-    def __init__(self):
+    def __init__(self, connection):
+        self.connection = connection
         self.data = {}
 
-    def __iter__(self):
+    def list(self, prefix=''):
         for path in sorted(self.data):
-            k = Key(self)
-            k.key = path
-            k.data, k.last_modified = self.data[path]
-            yield k
+            if path.startswith(prefix):
+                k = Key(self)
+                k.key = path
+                k.data, k.last_modified = self.data[path]
+                yield k
+
+    __iter__ = list
 
 class Key:
 
@@ -50,10 +54,15 @@ class Key:
 
         self.bucket.puts += 1
 
-    def check(self, base):
-        with open(os.path.join(base, self.key)) as f:
+    def check(self, base, prefix=''):
+        with open(os.path.join(base, self.key[len(prefix):])) as f:
             if not f.read() == self.data:
                 print 'missmatched data', self.key
+
+    def copy(self, dest_bucket, dest_path):
+        dest_bucket = self.bucket.connection.get_bucket(dest_bucket)
+        dest_bucket.data[dest_path] = self.bucket.data[self.key]
+        dest_bucket.puts += 1
 
     def delete(self):
         del self.bucket.data[self.key]
@@ -62,7 +71,7 @@ class Key:
 class S3Connection:
 
     def __init__(self):
-        self.buckets = dict(test=Bucket())
+        self.buckets = dict(test=Bucket(self))
 
     def get_bucket(self, name):
         return self.buckets[name]

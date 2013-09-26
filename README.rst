@@ -21,6 +21,9 @@ managed via FTP to S3.
 
   - known usage patterns mean we can simply use modification times.
 
+- Addresses an insane requirement of emulating insane rewrites by
+  making extra data copies. Whimper.
+
 Basic architecture
 ==================
 
@@ -55,6 +58,12 @@ Note on AWS keys
 
 Changes
 *******
+
+0.5.0 (2013-09-26)
+==================
+
+- Implement simple prefix rewrites that duplicate keys matching certain
+  prefixes to the same keys but with different prefixes.
 
 0.4.0 (2013-09-25)
 ==================

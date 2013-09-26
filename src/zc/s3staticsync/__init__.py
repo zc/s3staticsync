@@ -15,6 +15,7 @@ parser = optparse.OptionParser(usage=__doc__)
 parser.add_option('-w', '--worker-threads', type='int', default=9)
 parser.add_option('-f', '--clock-fudge-factor', type='int', default=1200)
 parser.add_option('-e', '--file-system-encoding', default='latin-1')
+parser.add_option('-p', '--prefixes')
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,12 @@ def main(args=None):
     options, args = parser.parse_args(args)
     fudge = options.clock_fudge_factor
     encoding = options.file_system_encoding
+
+    prefixes = [arg.split('=') for arg in args if '=' in arg]
+    dests = [dest for (prefix, dest) in prefixes]
+    assert not [dest for dest in dests if not dest]
+
+    args = [arg for arg in args if '=' not in arg]
 
     path, bucket_name = args
 
@@ -106,6 +113,18 @@ def main(args=None):
         for key in bucket:
             s3mtime = time_time_from_sixtuple(parse_time(key.last_modified))
             path = key.key
+
+            ##############################
+            # skip rewrite destinations  #
+            for dest in dests:
+                if path.startswith(dest):
+                    path = ''
+                    break
+
+            if not path:
+                continue
+            ##############################
+
             if path in fs:
                 mtime = fs.pop(path)
                 if mtime > s3mtime:
@@ -119,13 +138,25 @@ def main(args=None):
                 op, path = queue.get()
                 if path is None:
                     return
+
                 key = boto.s3.key.Key(bucket)
-                key.key = path
+
+                paths = [
+                    dest + path[len(prefix):]
+                    for (prefix, dest) in prefixes
+                    if path.startswith(prefix)
+                    ] + [path]
                 if op == DELETE:
-                    key.delete()
+                    for path in paths:
+                        key.key = path
+                        key.delete()
                 else:
+                    key.key = paths.pop(0)
                     path = os.path.join(base_path, path)
                     key.set_contents_from_filename(path.encode(encoding))
+                    for path in paths:
+                        key.copy(bucket_name, path)
+
             except Exception:
                 logger.exception('processing %r %r' % (op, path))
             finally:
