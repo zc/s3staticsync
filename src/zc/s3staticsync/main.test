@@ -182,6 +182,45 @@ duplicates everything in d1/d2 to a top level d2 directory.
     >>> for k in bucket.list('d1/'):
     ...     k.check('sample')
 
-    >>> zc.s3staticsync.main(['empty', 'test'])
+Do it again, for good measure:
+
+    >>> with mock.patch('time.time', return_value=t):
+    ...    zc.s3staticsync.main(
+    ...       [os.path.abspath('sample'), 'test',
+    ...       '=dup/', '=dup2/', 'd1/d2/=d2/',
+    ...       ])
+    >>> for k in bucket:
+    ...     print k.key
+    d1/d2/f1
+    d1/d2/f3
+    d1/f1
+    d1/f3
+    d2/f1
+    d2/f3
+    dup/d1/d2/f1
+    dup/d1/d2/f3
+    dup/d1/f1
+    dup/d1/f3
+    dup/f1
+    dup/f3
+    dup2/d1/d2/f1
+    dup2/d1/d2/f3
+    dup2/d1/f1
+    dup2/d1/f3
+    dup2/f1
+    dup2/f3
+    f1
+    f3
+
+Cleanup:
+
+    >>> zc.s3staticsync.main(
+    ...       ['empty', 'test',
+    ...       '=dup/', '=dup2/', 'd1/d2/=d2/',
+    ...       ])
     >>> list(bucket)
     []
+
+Important note!
+  If you change the prefix-rewriting configuration, it will only be
+  honored for new changes.
