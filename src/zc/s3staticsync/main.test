@@ -269,3 +269,49 @@ If you supply the -D option, no keys in S3 will be deleted:
     f1
     f2
     f3
+
+    >>> zc.s3staticsync.main(['empty', 'test'])
+    >>> list(bucket)
+    []
+
+Bucket prefixes
+===============
+
+If the bucket name has a '/' in it, then the text after the '/' is
+added as a prefix for each item.
+
+    >>> with mock.patch('time.time', return_value=t):
+    ...    zc.s3staticsync.main(
+    ...       [os.path.abspath('sample'), 'test/x/',
+    ...       '=dup/', '=dup2/', 'd1/d2/=d2/',
+    ...       ])
+    >>> for k in bucket:
+    ...     print k.key
+    x/d1/d2/f1
+    x/d1/d2/f2
+    x/d1/f1
+    x/d1/f2
+    x/d2/f1
+    x/d2/f2
+    x/dup/d1/d2/f1
+    x/dup/d1/d2/f2
+    x/dup/d1/f1
+    x/dup/d1/f2
+    x/dup/f1
+    x/dup/f2
+    x/dup2/d1/d2/f1
+    x/dup2/d1/d2/f2
+    x/dup2/d1/f1
+    x/dup2/d1/f2
+    x/dup2/f1
+    x/dup2/f2
+    x/f1
+    x/f2
+
+    >>> with mock.patch('time.time', return_value=t):
+    ...    zc.s3staticsync.main(
+    ...       ['empty', 'test/x/',
+    ...       '=dup/', '=dup2/', 'd1/d2/=d2/',
+    ...       ])
+    >>> list(bucket)
+    []

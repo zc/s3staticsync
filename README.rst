@@ -59,6 +59,11 @@ Note on AWS keys
 Changes
 *******
 
+0.7.0 (2013-09-30)
+==================
+
+Added support for bucket prefixes (mainly for secondary use cases).
+
 0.6.0 (2013-09-30)
 ==================
 
