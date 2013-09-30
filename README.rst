@@ -59,11 +59,16 @@ Note on AWS keys
 Changes
 *******
 
+0.6.0 (2013-09-30)
+==================
+
+Added a -D option to disable deleting keys.
+
 0.5.0 (2013-09-26)
 ==================
 
-- Implement simple prefix rewrites that duplicate keys matching certain
-  prefixes to the same keys but with different prefixes.
+Implement simple prefix rewrites that duplicate keys matching certain
+prefixes to the same keys but with different prefixes.
 
 0.4.0 (2013-09-25)
 ==================

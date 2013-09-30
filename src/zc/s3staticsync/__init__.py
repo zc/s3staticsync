@@ -15,7 +15,7 @@ parser = optparse.OptionParser(usage=__doc__)
 parser.add_option('-w', '--worker-threads', type='int', default=9)
 parser.add_option('-f', '--clock-fudge-factor', type='int', default=1200)
 parser.add_option('-e', '--file-system-encoding', default='latin-1')
-parser.add_option('-p', '--prefixes')
+parser.add_option('-D', '--no-delete', action='store_true')
 
 logger = logging.getLogger(__name__)
 
@@ -173,8 +173,9 @@ def main(args=None):
         if mtime > s3mtime:
             put((PUT, path))
 
-    for path in s3:
-        put((DELETE, path))
+    if not options.no_delete:
+        for path in s3:
+            put((DELETE, path))
 
     queue.join()
 

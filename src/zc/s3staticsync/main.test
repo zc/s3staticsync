@@ -224,3 +224,48 @@ Cleanup:
 Important note!
   If you change the prefix-rewriting configuration, it will only be
   honored for new changes.
+
+Avoiding deletes
+================
+
+If you supply the -D option, no keys in S3 will be deleted:
+
+    >>> with mock.patch('time.time', return_value=t):
+    ...    zc.s3staticsync.main(
+    ...       [os.path.abspath('sample'), 'test',
+    ...       ])
+    >>> for k in bucket:
+    ...     print k.key
+    d1/d2/f1
+    d1/d2/f3
+    d1/f1
+    d1/f3
+    f1
+    f3
+
+
+    >>> t += 3000
+    >>> with mock.patch('time.time', return_value=t):
+    ...     mkfile('sample/f2')
+    ...     mkfile('sample/d1/f2')
+    ...     mkfile('sample/d1/d2/f2')
+    >>> os.remove('sample/f3')
+    >>> os.remove('sample/d1/f3')
+    >>> os.remove('sample/d1/d2/f3')
+
+
+    >>> with mock.patch('time.time', return_value=t):
+    ...    zc.s3staticsync.main(
+    ...       [os.path.abspath('sample'), 'test', '-D'
+    ...       ])
+    >>> for k in bucket:
+    ...     print k.key
+    d1/d2/f1
+    d1/d2/f2
+    d1/d2/f3
+    d1/f1
+    d1/f2
+    d1/f3
+    f1
+    f2
+    f3
