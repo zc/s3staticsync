@@ -63,6 +63,12 @@ def main(args=None):
 
     path, bucket_name = args
 
+    if '/' in bucket_name:
+        bucket_name, bucket_prefix = bucket_name.split('/', 1)
+    else:
+        bucket_prefix = ''
+    len_bucket_prefix = len(bucket_prefix)
+
     # We're going to rely below on dict's being thread safe and dict
     # ops being atomic.
     fs = {}
@@ -110,9 +116,9 @@ def main(args=None):
 
     @thread
     def s3_thread():
-        for key in bucket:
+        for key in bucket.list(bucket_prefix):
             s3mtime = time_time_from_sixtuple(parse_time(key.last_modified))
-            path = key.key
+            path = key.key[len_bucket_prefix:]
 
             ##############################
             # skip rewrite destinations  #
@@ -148,14 +154,14 @@ def main(args=None):
                     ] + [path]
                 if op == DELETE:
                     for path in paths:
-                        key.key = path
+                        key.key = bucket_prefix + path
                         key.delete()
                 else:
-                    key.key = paths.pop(0)
+                    key.key = bucket_prefix + paths.pop(0)
                     path = os.path.join(base_path, path)
                     key.set_contents_from_filename(path.encode(encoding))
                     for path in paths:
-                        key.copy(bucket_name, path)
+                        key.copy(bucket_name, bucket_prefix + path)
 
             except Exception:
                 logger.exception('processing %r %r' % (op, path))
