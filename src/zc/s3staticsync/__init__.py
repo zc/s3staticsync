@@ -18,6 +18,9 @@ parser.add_option('-f', '--clock-fudge-factor', type='int', default=1200)
 parser.add_option('-e', '--file-system-encoding', default='latin-1')
 parser.add_option('-D', '--no-delete', action='store_true')
 parser.add_option('-i', '--index')
+parser.add_option('-I', '--ignore-index', action='store_true',
+                  help="List the S3 bucket rather than using the index file")
+parser.add_option('-l', '--lock-file')
 
 logger = logging.getLogger(__name__)
 
@@ -52,12 +55,19 @@ def main(args=None):
         logging.basicConfig()
 
     options, args = parser.parse_args(args)
+
+    if options.lock_file:
+        import zc.lockfile
+        lock = zc.lockfile.LockFile(options.lock_file)
+    else:
+        lock = None
+
     fudge = options.clock_fudge_factor
     encoding = options.file_system_encoding
     had_index = False
     s3 = {}
     if options.index:
-        if os.path.exists(options.index):
+        if not options.ignore_index and os.path.exists(options.index):
             with open(options.index) as f:
                 s3 = marshal.load(f)
             had_index = True
@@ -212,6 +222,9 @@ def main(args=None):
             put((None, path))
 
     queue.join()
+
+    if lock is not None:
+        lock.close()
 
     for _ in workers:
         put((None, None))

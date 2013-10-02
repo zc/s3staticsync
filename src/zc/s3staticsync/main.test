@@ -412,7 +412,6 @@ second:
 At this point, the index has been updated, so if we sync again, there
 won't be any changes:
 
-    >>> before = now
     >>> bucket.puts = bucket.deletes = bucket.listed = 0
     >>> zc.s3staticsync.main(
     ...    [os.path.abspath('sample'), 'test/x/',
@@ -420,3 +419,57 @@ won't be any changes:
     ...    ])
     >>> bucket.listed, bucket.puts, bucket.deletes
     (0, 0, 0)
+
+Sometimes, we want to read S3, to make sure we're in sync, but we
+still want to update the index.  We can add the -I option for this:
+
+    >>> zc.s3staticsync.main(
+    ...    [os.path.abspath('sample'), 'test/x/',
+    ...    '=dup/', '=dup2/', 'd1/d2/=d2/', '-iindex', '-I',
+    ...    ])
+    >>> bucket.listed, bucket.puts, bucket.deletes
+    ('x/', 3, 0)
+
+(Note that we uploaded f3 again because, without a local index, we use
+a fudge factor and are a lot more conservative about uploading things.)
+
+Locking
+=======
+
+If running this from cron, you probably don't want runs to overlap.
+To avoid this, you can specify a lock file using the -l option:
+
+    >>> zc.s3staticsync.main(
+    ...    [os.path.abspath('sample'), 'test/x/',
+    ...    '=dup/', '=dup2/', 'd1/d2/=d2/', '-iindex', '-llock',
+    ...    ])
+
+    >>> os.path.exists('lock')
+    True
+
+    >>> with open('lock') as f:
+    ...     pid = int(f.read().strip())
+    >>> pid == os.getpid()
+    True
+
+If we lock ourselves
+
+    >>> import zc.lockfile
+    >>> lock =  zc.lockfile.LockFile('lock')
+
+Then we'll get an error is we try to sync:
+
+    >>> zc.s3staticsync.main(
+    ...    [os.path.abspath('sample'), 'test/x/',
+    ...    '=dup/', '=dup2/', 'd1/d2/=d2/', '-iindex', '-llock',
+    ...    ])
+    Traceback (most recent call last):
+       ...
+    LockError: Couldn't lock 'lock'
+
+    >>> lock.close()
+
+    >>> zc.s3staticsync.main(
+    ...    [os.path.abspath('sample'), 'test/x/',
+    ...    '=dup/', '=dup2/', 'd1/d2/=d2/', '-iindex', '-llock',
+    ...    ])

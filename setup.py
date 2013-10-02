@@ -13,7 +13,7 @@
 ##############################################################################
 name, version = 'zc.s3staticsync', '0'
 
-install_requires = ['setuptools', 'boto', 'keyring']
+install_requires = ['setuptools', 'boto', 'keyring', 'zc.lockfile']
 extras_require = dict(test=['mock', 'zope.testing'])
 
 entry_points = """

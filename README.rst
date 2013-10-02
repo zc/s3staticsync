@@ -66,7 +66,10 @@ Changes
 0.8.0 (2013-10-??)
 ==================
 
-Added support for using a local index file to avoid lengthy bucket scans.
+Added support for using a local index file to avoid lengthy bucket
+scans.
+
+Added lock-file support to avoid simultaneous syncs.
 
 0.7.0 (2013-09-30)
 ==================
