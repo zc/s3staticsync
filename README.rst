@@ -63,7 +63,7 @@ Note on AWS keys
 Changes
 *******
 
-0.8.0 (2013-10-??)
+0.8.0 (2013-10-02)
 ==================
 
 Added support for using a local index file to avoid lengthy bucket
