@@ -5,14 +5,12 @@ We have a same directory and a test bucket (in a faux s3).
 
     >>> import os, mock
     >>> os.mkdir('sample')
-    >>> t = 1379885832.0
-    >>> with mock.patch('time.time', return_value=t):
-    ...     mkfile('sample/f1')
-    ...     mkfile('sample/d1/f1')
-    ...     mkfile('sample/d1/d2/f1')
-    ...     mkfile('sample/f2')
-    ...     mkfile('sample/d1/f2')
-    ...     mkfile('sample/d1/d2/f2')
+    >>> mkfile('sample/f1')
+    >>> mkfile('sample/d1/f1')
+    >>> mkfile('sample/d1/d2/f1')
+    >>> mkfile('sample/f2')
+    >>> mkfile('sample/d1/f2')
+    >>> mkfile('sample/d1/d2/f2')
 
 Cuz we're mean, we'll create a broken symlink:
 
@@ -20,15 +18,14 @@ Cuz we're mean, we'll create a broken symlink:
 
 Later:
 
-    >>> t += 3600
+    >>> now += 3600
 
 We'll sync to our faux bucket:
 
     >>> import zc.s3staticsync
 
-    >>> t += 30
-    >>> with mock.patch('time.time', return_value=t):
-    ...    zc.s3staticsync.main([os.path.abspath('sample'), 'test'])
+    >>> now += 30
+    >>> zc.s3staticsync.main([os.path.abspath('sample'), 'test'])
     ... # doctest: +ELLIPSIS
     bad file 'd1/hahaha'
     Traceback (most recent call last):
@@ -62,9 +59,8 @@ We did 6 puts and no deletes:
 
 Time passes and we so it all again:
 
-    >>> t += 1800
-    >>> with mock.patch('time.time', return_value=t):
-    ...    zc.s3staticsync.main([os.path.abspath('sample'), 'test'])
+    >>> now += 1800
+    >>> zc.s3staticsync.main([os.path.abspath('sample'), 'test'])
 
 Nothing should have been put or deleted:
 
@@ -74,20 +70,17 @@ Nothing should have been put or deleted:
 
  Let's make some changes and make sure they're reflected:
 
-    >>> t += 1000
-    >>> with mock.patch('time.time', return_value=t):
-    ...     mkfile('sample/d1/d2/f1')
-    ...     mkfile('sample/f3')
-    ...     mkfile('sample/d1/f3')
-    ...     mkfile('sample/d1/d2/f3')
+    >>> now += 1000
+    >>> mkfile('sample/d1/d2/f1')
+    >>> mkfile('sample/f3')
+    >>> mkfile('sample/d1/f3')
+    >>> mkfile('sample/d1/d2/f3')
 
     >>> os.remove('sample/f2')
     >>> os.remove('sample/d1/f2')
     >>> os.remove('sample/d1/d2/f2')
 
-
-    >>> with mock.patch('time.time', return_value=t+800):
-    ...    zc.s3staticsync.main([os.path.abspath('sample'), 'test'])
+    >>> zc.s3staticsync.main([os.path.abspath('sample'), 'test'])
 
     >>> for k in bucket:
     ...     print k.key
@@ -107,17 +100,15 @@ modification time. To account for that, and for clocks being out of
 sync, we add a fudge factor to the modification time. This causes
 newly modified files to be uploaded twice:
 
-    >>> t += 1800
-    >>> with mock.patch('time.time', return_value=t):
-    ...    zc.s3staticsync.main([os.path.abspath('sample'), 'test'])
+    >>> now += 1800
+    >>> zc.s3staticsync.main([os.path.abspath('sample'), 'test'])
     >>> bucket.puts, bucket.deletes
     (14, 3)
 
 But only twice:
 
-    >>> t += 1800
-    >>> with mock.patch('time.time', return_value=t):
-    ...    zc.s3staticsync.main([os.path.abspath('sample'), 'test'])
+    >>> now += 1800
+    >>> zc.s3staticsync.main([os.path.abspath('sample'), 'test'])
     >>> bucket.puts, bucket.deletes
     (14, 3)
 
@@ -141,11 +132,10 @@ You can provide some prefix pairs on the command line. When adding or
 removing keys, you can add and remove duplicate paths starting with a
 given prefix to another prefix.
 
-    >>> with mock.patch('time.time', return_value=t):
-    ...    zc.s3staticsync.main(
-    ...       [os.path.abspath('sample'), 'test',
-    ...       '=dup/', '=dup2/', 'd1/d2/=d2/',
-    ...       ])
+    >>> zc.s3staticsync.main(
+    ...    [os.path.abspath('sample'), 'test',
+    ...    '=dup/', '=dup2/', 'd1/d2/=d2/',
+    ...    ])
 
 Here we duplicated everything to dup1 and dup2, and
 duplicates everything in d1/d2 to a top level d2 directory.
@@ -184,11 +174,10 @@ duplicates everything in d1/d2 to a top level d2 directory.
 
 Do it again, for good measure:
 
-    >>> with mock.patch('time.time', return_value=t):
-    ...    zc.s3staticsync.main(
-    ...       [os.path.abspath('sample'), 'test',
-    ...       '=dup/', '=dup2/', 'd1/d2/=d2/',
-    ...       ])
+    >>> zc.s3staticsync.main(
+    ...    [os.path.abspath('sample'), 'test',
+    ...    '=dup/', '=dup2/', 'd1/d2/=d2/',
+    ...    ])
     >>> for k in bucket:
     ...     print k.key
     d1/d2/f1
@@ -230,10 +219,9 @@ Avoiding deletes
 
 If you supply the -D option, no keys in S3 will be deleted:
 
-    >>> with mock.patch('time.time', return_value=t):
-    ...    zc.s3staticsync.main(
-    ...       [os.path.abspath('sample'), 'test',
-    ...       ])
+    >>> zc.s3staticsync.main(
+    ...    [os.path.abspath('sample'), 'test',
+    ...    ])
     >>> for k in bucket:
     ...     print k.key
     d1/d2/f1
@@ -244,20 +232,18 @@ If you supply the -D option, no keys in S3 will be deleted:
     f3
 
 
-    >>> t += 3000
-    >>> with mock.patch('time.time', return_value=t):
-    ...     mkfile('sample/f2')
-    ...     mkfile('sample/d1/f2')
-    ...     mkfile('sample/d1/d2/f2')
+    >>> now += 3000
+    >>> mkfile('sample/f2')
+    >>> mkfile('sample/d1/f2')
+    >>> mkfile('sample/d1/d2/f2')
     >>> os.remove('sample/f3')
     >>> os.remove('sample/d1/f3')
     >>> os.remove('sample/d1/d2/f3')
 
 
-    >>> with mock.patch('time.time', return_value=t):
-    ...    zc.s3staticsync.main(
-    ...       [os.path.abspath('sample'), 'test', '-D'
-    ...       ])
+    >>> zc.s3staticsync.main(
+    ...    [os.path.abspath('sample'), 'test', '-D'
+    ...    ])
     >>> for k in bucket:
     ...     print k.key
     d1/d2/f1
@@ -280,11 +266,10 @@ Bucket prefixes
 If the bucket name has a '/' in it, then the text after the '/' is
 added as a prefix for each item.
 
-    >>> with mock.patch('time.time', return_value=t):
-    ...    zc.s3staticsync.main(
-    ...       [os.path.abspath('sample'), 'test/x/',
-    ...       '=dup/', '=dup2/', 'd1/d2/=d2/',
-    ...       ])
+    >>> zc.s3staticsync.main(
+    ...    [os.path.abspath('sample'), 'test/x/',
+    ...    '=dup/', '=dup2/', 'd1/d2/=d2/',
+    ...    ])
     >>> for k in bucket:
     ...     print k.key
     x/d1/d2/f1
@@ -308,10 +293,183 @@ added as a prefix for each item.
     x/f1
     x/f2
 
-    >>> with mock.patch('time.time', return_value=t):
-    ...    zc.s3staticsync.main(
-    ...       ['empty', 'test/x/',
-    ...       '=dup/', '=dup2/', 'd1/d2/=d2/',
-    ...       ])
+    >>> zc.s3staticsync.main(
+    ...    ['empty', 'test/x/',
+    ...    '=dup/', '=dup2/', 'd1/d2/=d2/',
+    ...    ])
     >>> list(bucket)
     []
+
+Using a local index
+-------------------
+
+Listing a large S3 bucket can be expensive.  To avoid this expense, we
+can create a local index of files that lists every file and it's
+modification time as of the last time we synced.
+
+    >>> before = now
+    >>> bucket.puts = bucket.deletes = bucket.listed = 0
+    >>> zc.s3staticsync.main(
+    ...    [os.path.abspath('sample'), 'test/x/',
+    ...    '=dup/', '=dup2/', 'd1/d2/=d2/', '-iindex'
+    ...    ])
+
+Now, we have an index file:
+
+    >>> import marshal, pprint
+    >>> with open('index') as f:
+    ...     pprint.pprint(marshal.load(f))
+    {u'd1/d2/f1': 1379910262,
+     u'd1/d2/f2': 1379916862,
+     u'd1/f1': 1379903832,
+     u'd1/f2': 1379916862,
+     u'f1': 1379903832,
+     u'f2': 1379916862}
+
+Because the index didn't exist, we still listed the bucket:
+
+    >>> bucket.listed, bucket.puts, bucket.deletes
+    ('x/', 20, 0)
+
+If we started with an index and sync in the same second that files are
+written, we sleep a second to make sure we don't miss updates.  Since
+we didn't have an index, we didn't sleep:
+
+    >>> now == before
+    True
+
+Now, we'll make some changes:
+
+    >>> now += 3600
+    >>> mkfile('sample/d1/d2/f1')
+    >>> mkfile('sample/f3')
+    >>> mkfile('sample/d1/f3')
+    >>> mkfile('sample/d1/d2/f3')
+
+    >>> os.remove('sample/f2')
+    >>> os.remove('sample/d1/f2')
+    >>> os.remove('sample/d1/d2/f2')
+    >>> now += 3600
+
+Now when we sync, we'll use the index:
+
+    >>> before = now
+    >>> bucket.puts = bucket.deletes = bucket.listed = 0
+    >>> zc.s3staticsync.main(
+    ...    [os.path.abspath('sample'), 'test/x/',
+    ...    '=dup/', '=dup2/', 'd1/d2/=d2/', '-iindex'
+    ...    ])
+    >>> bucket.listed, bucket.puts, bucket.deletes
+    (0, 14, 10)
+
+The bucket wasn't consulted, but we still did the right updates:
+
+    >>> for k in bucket:
+    ...     print k.key
+    x/d1/d2/f1
+    x/d1/d2/f3
+    x/d1/f1
+    x/d1/f3
+    x/d2/f1
+    x/d2/f3
+    x/dup/d1/d2/f1
+    x/dup/d1/d2/f3
+    x/dup/d1/f1
+    x/dup/d1/f3
+    x/dup/f1
+    x/dup/f3
+    x/dup2/d1/d2/f1
+    x/dup2/d1/d2/f3
+    x/dup2/d1/f1
+    x/dup2/d1/f3
+    x/dup2/f1
+    x/dup2/f3
+    x/f1
+    x/f3
+
+Because we synced long after updating the files, we didn't sleep:
+
+    >>> now == before
+    True
+
+Now, we'll update a file and sync again:
+
+    >>> mkfile('sample/f3')
+    >>> bucket.puts = bucket.deletes = bucket.listed = 0
+    >>> zc.s3staticsync.main(
+    ...    [os.path.abspath('sample'), 'test/x/',
+    ...    '=dup/', '=dup2/', 'd1/d2/=d2/', '-iindex'
+    ...    ])
+    >>> bucket.listed, bucket.puts, bucket.deletes
+    (0, 3, 0)
+
+Because we synced in the same second we write the file, we slept a
+second:
+
+    >>> 0.9 < (now - before) < 1.1
+    True
+
+At this point, the index has been updated, so if we sync again, there
+won't be any changes:
+
+    >>> bucket.puts = bucket.deletes = bucket.listed = 0
+    >>> zc.s3staticsync.main(
+    ...    [os.path.abspath('sample'), 'test/x/',
+    ...    '=dup/', '=dup2/', 'd1/d2/=d2/', '-iindex'
+    ...    ])
+    >>> bucket.listed, bucket.puts, bucket.deletes
+    (0, 0, 0)
+
+Sometimes, we want to read S3, to make sure we're in sync, but we
+still want to update the index.  We can add the -I option for this:
+
+    >>> zc.s3staticsync.main(
+    ...    [os.path.abspath('sample'), 'test/x/',
+    ...    '=dup/', '=dup2/', 'd1/d2/=d2/', '-iindex', '-I',
+    ...    ])
+    >>> bucket.listed, bucket.puts, bucket.deletes
+    ('x/', 3, 0)
+
+(Note that we uploaded f3 again because, without a local index, we use
+a fudge factor and are a lot more conservative about uploading things.)
+
+Locking
+=======
+
+If running this from cron, you probably don't want runs to overlap.
+To avoid this, you can specify a lock file using the -l option:
+
+    >>> zc.s3staticsync.main(
+    ...    [os.path.abspath('sample'), 'test/x/',
+    ...    '=dup/', '=dup2/', 'd1/d2/=d2/', '-iindex', '-llock',
+    ...    ])
+
+    >>> os.path.exists('lock')
+    True
+
+    >>> with open('lock') as f:
+    ...     pid = int(f.read().strip())
+    >>> pid == os.getpid()
+    True
+
+If we lock ourselves
+
+    >>> import zc.lockfile
+    >>> lock =  zc.lockfile.LockFile('lock')
+
+Then we'll get an error is we try to sync:
+
+    >>> zc.s3staticsync.main(
+    ...    [os.path.abspath('sample'), 'test/x/',
+    ...    '=dup/', '=dup2/', 'd1/d2/=d2/', '-iindex', '-llock',
+    ...    ])
+    Traceback (most recent call last):
+       ...
+    LockError: Couldn't lock 'lock'
+
+    >>> lock.close()
+
+    >>> zc.s3staticsync.main(
+    ...    [os.path.abspath('sample'), 'test/x/',
+    ...    '=dup/', '=dup2/', 'd1/d2/=d2/', '-iindex', '-llock',
+    ...    ])

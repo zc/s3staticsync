@@ -28,7 +28,9 @@ class Bucket:
         self.connection = connection
         self.data = {}
 
+    listed = None
     def list(self, prefix=''):
+        self.listed = prefix
         for path in sorted(self.data):
             if path.startswith(prefix):
                 k = Key(self)
@@ -101,6 +103,15 @@ def setup(test):
     zope.testing.setupstack.context_manager(
         test, mock.patch('zc.s3staticsync.logger.exception',
                          side_effect=exception))
+
+    test.globs['now'] = 1379885832.0
+    zope.testing.setupstack.context_manager(
+        test, mock.patch('time.time', side_effect=lambda : test.globs['now']))
+
+    def sleep(s):
+        test.globs['now'] += s
+    zope.testing.setupstack.context_manager(
+        test, mock.patch('time.sleep', side_effect=sleep))
 
 def test_suite():
     return doctest.DocFileSuite(

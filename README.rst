@@ -4,7 +4,8 @@ Yet another took for syncing files to S3
 Why? It was easier to write the tool I needed than to figure out
 if existing tools did what I needed (sad, I know).  I actually did
 look at existing tools, but they didn't appear to be scalable enough
-for my use case.
+for my use case.  As it turned out, I ended up having a bunch of weird
+extra use cases that made writing this worthwhile.
 
 This tool is specifically designed for syncing static web sites
 managed via FTP to S3.
@@ -33,6 +34,9 @@ On each syncronization:
 
   This is done in 2 threads.
 
+  Optionally, we can keep an index, based on the previous file scan
+  and avoid scanning s3.
+
 - Compute diff.
 
 - Apply diff to s3
@@ -58,6 +62,14 @@ Note on AWS keys
 
 Changes
 *******
+
+0.8.0 (2013-10-??)
+==================
+
+Added support for using a local index file to avoid lengthy bucket
+scans.
+
+Added lock-file support to avoid simultaneous syncs.
 
 0.7.0 (2013-09-30)
 ==================
