@@ -96,7 +96,9 @@ def main(args=None):
     def worker(base_path):
         while 1:
             try:
-                mtime, path = queue.get()
+                mtime, queued_path = queue.get()
+
+                path = queued_path
                 if path is None:
                     return
 
@@ -107,29 +109,64 @@ def main(args=None):
                     for (prefix, dest) in prefixes
                     if path.startswith(prefix)
                     ] + [path]
-                if mtime is None:
-                    for path in paths:
-                        key.key = bucket_prefix + path
-                        key.delete()
-                else:
-                    if had_index:
-                        # We only store mtimes to the nearest second.
-                        # We don't have a fudge factor, so there's a
-                        # chance that someone might update the file in
-                        # the same second, so we check if a second has
-                        # passed and sleep if it hasn't.
-                        now = time_time_from_sixtuple(time.gmtime(time.time()))
-                        if not now > mtime:
-                            time.sleep(1)
+                if mtime is None: # delete
+                    try:
+                        try:
+                            for path in paths:
+                                key.key = bucket_prefix + path
+                                key.delete()
+                        except Exception:
+                            logger.exception('deleting %r, retrying' % key.key)
+                            time.sleep(9)
+                            for path in paths:
+                                key.key = bucket_prefix + path
+                                key.delete()
+                    except Exception:
+                        if index is not None:
+                            # Failed to delete. Put the key back so we
+                            # try again later
+                            index[queued_path] = 1
+                        raise
 
-                    key.key = bucket_prefix + paths.pop(0)
-                    path = os.path.join(base_path, path)
-                    key.set_contents_from_filename(path.encode(encoding))
-                    for path in paths:
-                        key.copy(bucket_name, bucket_prefix + path)
+                else: # upload
+                    try:
+                        if had_index:
+                            # We only store mtimes to the nearest second.
+                            # We don't have a fudge factor, so there's a
+                            # chance that someone might update the file in
+                            # the same second, so we check if a second has
+                            # passed and sleep if it hasn't.
+                            now = time_time_from_sixtuple(
+                                time.gmtime(time.time()))
+                            if not now > mtime:
+                                time.sleep(1)
+
+                        key.key = bucket_prefix + paths.pop(0)
+                        path = os.path.join(base_path, path)
+                        try:
+                            key.set_contents_from_filename(
+                                path.encode(encoding))
+                            for path in paths:
+                                key.copy(bucket_name, bucket_prefix + path)
+                        except Exception:
+                            logger.exception('uploading %r %r, retrying'
+                                             % (mtime, path))
+                            time.sleep(9)
+                            key.set_contents_from_filename(
+                                path.encode(encoding))
+                            for path in paths:
+                                key.copy(bucket_name, bucket_prefix + path)
+
+                    except Exception:
+                        if index is not None:
+                            # Upload failed. Remove from index so we
+                            # try again later (if the path is still
+                            # around).
+                            index.pop(queued_path)
+                        raise
 
             except Exception:
-                logger.exception('processing %r %r' % (op, path))
+                logger.exception('processing %r %r' % (mtime, path))
             finally:
                 queue.task_done()
 
@@ -156,6 +193,8 @@ def main(args=None):
                     continue
 
                 key = rname.decode(encoding)
+                if index is not None:
+                    index[key] = mtime
                 if key in s3:
                     # We can go ahead and do the check
                     s3mtime = s3.pop(key)
@@ -163,9 +202,6 @@ def main(args=None):
                         put((mtime, key))
                 else:
                     fs[key] = mtime
-
-                if index is not None:
-                    index[key] = mtime
 
     fs_thread = thread(listfs, path, '')
 
@@ -208,9 +244,6 @@ def main(args=None):
         s3_thread.join()
 
     fs_thread.join()
-    if index is not None:
-        with open(options.index, 'w') as f:
-            marshal.dump(index, f)
 
     for (path, mtime) in fs.iteritems():
         s3mtime = s3.pop(path, 0)
@@ -222,6 +255,10 @@ def main(args=None):
             put((None, path))
 
     queue.join()
+
+    if index is not None:
+        with open(options.index, 'w') as f:
+            marshal.dump(index, f)
 
     if lock is not None:
         lock.close()

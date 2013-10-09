@@ -473,3 +473,85 @@ Then we'll get an error is we try to sync:
     ...    [os.path.abspath('sample'), 'test/x/',
     ...    '=dup/', '=dup2/', 'd1/d2/=d2/', '-iindex', '-llock',
     ...    ])
+
+S3 Errors
+=========
+
+When using an index, if there's an error uploading to S3:
+
+- The upload will be retried once after a 9 second sleep.
+
+- If an upload fails a second time, the index won't have an entry for
+  the document, causing further attemps on the next sync.
+
+    >>> bucket.fail = True
+    >>> mkfile('sample/d1/d2/f1')
+
+    >>> now += 99
+    >>> before = now
+    >>> bucket.puts = bucket.deletes = bucket.listed = 0
+    >>> zc.s3staticsync.main(
+    ...    [os.path.abspath('sample'), 'test/x/',
+    ...    '=dup/', '=dup2/', 'd1/d2/=d2/', '-iindex', '-llock',
+    ...    ]) # doctest: +ELLIPSIS
+    uploading 1379924063 ...d1/d2/f1', retrying
+    Traceback (most recent call last):
+    ...
+    ValueError: fail
+    processing 1379924063 ...sample/d1/d2/f1'
+    Traceback (most recent call last):
+    ...
+    ValueError: fail
+
+    >>> bucket.listed, bucket.puts, bucket.deletes
+    (0, 2, 0)
+
+    >>> with open('index') as f:
+    ...     print 'd1/d2/f1' in marshal.load(f)
+    False
+
+    >>> 8.9 < (now - before) < 9.1
+    True
+
+Later, hopefully, the upload will succeed:
+
+    >>> bucket.fail = False
+    >>> now += 99
+    >>> bucket.puts = bucket.deletes = bucket.listed = 0
+    >>> zc.s3staticsync.main(
+    ...    [os.path.abspath('sample'), 'test/x/',
+    ...    '=dup/', '=dup2/', 'd1/d2/=d2/', '-iindex', '-llock',
+    ...    ]) # doctest: +ELLIPSIS
+    >>> bucket.listed, bucket.puts, bucket.deletes
+    (0, 4, 0)
+    >>> with open('index') as f:
+    ...     print 'd1/d2/f1' in marshal.load(f)
+    True
+
+Same drill with deletes:
+
+    >>> bucket.fail = True
+    >>> os.remove('sample/d1/d2/f1')
+    >>> now += 99
+    >>> bucket.puts = bucket.deletes = bucket.listed = 0
+    >>> before = now
+    >>> zc.s3staticsync.main(
+    ...    [os.path.abspath('sample'), 'test/x/',
+    ...    '=dup/', '=dup2/', 'd1/d2/=d2/', '-iindex', '-llock',
+    ...    ]) # doctest: +ELLIPSIS
+    deleting u'x/dup/d1/d2/f1', retrying
+    Traceback (most recent call last):
+    ...
+    ValueError: fail
+    processing None u'dup/d1/d2/f1'
+    Traceback (most recent call last):
+    ...
+    ValueError: fail
+
+    >>> bucket.listed, bucket.puts, bucket.deletes
+    (0, 0, 2)
+    >>> with open('index') as f:
+    ...     print 'd1/d2/f1' in marshal.load(f)
+    True
+    >>> 8.9 < (now - before) < 9.1
+    True

@@ -1,16 +1,10 @@
 Yet another took for syncing files to S3
 ****************************************
 
-Why? It was easier to write the tool I needed than to figure out
-if existing tools did what I needed (sad, I know).  I actually did
-look at existing tools, but they didn't appear to be scalable enough
-for my use case.  As it turned out, I ended up having a bunch of weird
-extra use cases that made writing this worthwhile.
-
 This tool is specifically designed for syncing static web sites
 managed via FTP to S3.
 
-- Posix (don't need windows support)
+- Posix only.
 
 - Efficient:
 
@@ -24,6 +18,11 @@ managed via FTP to S3.
 
 - Addresses an insane requirement of emulating insane rewrites by
   making extra data copies. Whimper.
+
+- Option local index avoids listing buckets, which is important for
+  large buckets.
+
+- Retry on failed AWS operations.
 
 Basic architecture
 ==================
@@ -62,6 +61,11 @@ Note on AWS keys
 
 Changes
 *******
+
+0.8.1 (2013-10-09)
+==================
+
+Added missing retry on failed adds or deletes.
 
 0.8.0 (2013-10-02)
 ==================

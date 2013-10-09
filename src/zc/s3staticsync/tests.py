@@ -23,6 +23,7 @@ import zope.testing.setupstack
 class Bucket:
 
     puts = deletes = 0
+    fail = False
 
     def __init__(self, connection):
         self.connection = connection
@@ -46,6 +47,11 @@ class Key:
         self.bucket = bucket
 
     def set_contents_from_filename(self, filename):
+        self.bucket.puts += 1
+
+        if self.bucket.fail:
+            raise ValueError("fail")
+
         self.last_modified = (
             "%4.4d-%2.2d-%2.2dT%2.2d:%2.2d:%2.2d.123"
             % time.gmtime(time.time())[:6]
@@ -54,8 +60,6 @@ class Key:
             self.bucket.data[self.key] = (
                 f.read(), self.last_modified)
 
-        self.bucket.puts += 1
-
     def check(self, base, prefix=''):
         with open(os.path.join(base, self.key[len(prefix):])) as f:
             if not f.read() == self.data:
@@ -63,12 +67,16 @@ class Key:
 
     def copy(self, dest_bucket, dest_path):
         dest_bucket = self.bucket.connection.get_bucket(dest_bucket)
-        dest_bucket.data[dest_path] = self.bucket.data[self.key]
         dest_bucket.puts += 1
+        if self.bucket.fail:
+            raise ValueError("fail")
+        dest_bucket.data[dest_path] = self.bucket.data[self.key]
 
     def delete(self):
-        del self.bucket.data[self.key]
         self.bucket.deletes += 1
+        if self.bucket.fail:
+            raise ValueError("fail")
+        del self.bucket.data[self.key]
 
 class S3Connection:
 
