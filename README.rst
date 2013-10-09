@@ -62,7 +62,10 @@ Note on AWS keys
 Changes
 *******
 
-Added retry on failed adds or deletes.
+0.8.1 (2013-10-09)
+==================
+
+Added missing retry on failed adds or deletes.
 
 0.8.0 (2013-10-02)
 ==================
