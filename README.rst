@@ -62,6 +62,10 @@ Note on AWS keys
 Changes
 *******
 
+Added a *simple* restore script for restoring files from S3.  It
+can restore an entire directory or update a directory, syncing with
+S3 based on file size.
+
 0.8.1 (2013-10-09)
 ==================
 
