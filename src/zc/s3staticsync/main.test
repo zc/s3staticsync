@@ -1,7 +1,7 @@
 S3static sync tests
 ===================
 
-We have a same directory and a test bucket (in a faux s3).
+We have a sample directory and a test bucket (in a faux s3).
 
     >>> import os, mock
     >>> os.mkdir('sample')

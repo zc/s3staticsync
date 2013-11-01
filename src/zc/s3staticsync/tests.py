@@ -22,7 +22,7 @@ import zope.testing.setupstack
 
 class Bucket:
 
-    puts = deletes = 0
+    puts = deletes = gets = 0
     fail = False
 
     def __init__(self, connection):
@@ -59,6 +59,20 @@ class Key:
         with open(filename) as f:
             self.bucket.data[self.key] = (
                 f.read(), self.last_modified)
+
+
+    def get_contents_to_filename(self, filename):
+        self.bucket.gets += 1
+
+        if self.bucket.fail:
+            raise ValueError("fail")
+
+        with open(filename, 'w') as f:
+            f.write(self.bucket.data[self.key][0])
+
+    @property
+    def size(self):
+        return len(self.bucket.data[self.key][0])
 
     def check(self, base, prefix=''):
         with open(os.path.join(base, self.key[len(prefix):])) as f:
@@ -123,6 +137,6 @@ def setup(test):
 
 def test_suite():
     return doctest.DocFileSuite(
-        'main.test',
+        'main.test', 'restore.test',
         setUp=setup, tearDown=zope.testing.setupstack.tearDown)
 
