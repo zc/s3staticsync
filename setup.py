@@ -19,6 +19,7 @@ extras_require = dict(test=['mock', 'zope.testing'])
 entry_points = """
 [console_scripts]
 s3staticsync = zc.s3staticsync:main
+s3staticrestore = zc.s3staticsync.restore:main
 """
 
 from setuptools import setup

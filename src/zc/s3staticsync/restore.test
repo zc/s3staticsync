@@ -1,0 +1,88 @@
+S3static sync restore tests
+===========================
+
+Use case: An FTP server machine has gone away.  We need to restore
+data from S3.  We might have been able to restroe from some sort of
+backups/snapshot.
+
+We have a sample directory and a test bucket (in a faux s3).
+
+    >>> import os, mock
+    >>> os.mkdir('sample')
+    >>> mkfile('sample/f1')
+    >>> mkfile('sample/d1/f1')
+    >>> mkfile('sample/d1/d2/f1')
+    >>> mkfile('sample/f2')
+    >>> mkfile('sample/d1/f2')
+    >>> mkfile('sample/d1/d2/f2')
+    >>> open('sample/d1/d2/empty', 'w').close()
+
+Later:
+
+    >>> now += 3600
+
+We'll sync to our faux bucket:
+
+    >>> import zc.s3staticsync
+
+    >>> now += 30
+    >>> zc.s3staticsync.main([os.path.abspath('sample'), 'test'])
+
+Now, we'll create a new directory and restore to it:
+
+    >>> os.mkdir('sample2')
+    >>> import pkg_resources
+    >>> main = pkg_resources.load_entry_point(
+    ...     "zc.s3staticsync", "console_scripts", "s3staticrestore")
+    >>> main([os.path.abspath('sample2'), 'test'])
+
+Let's compare sample and sample2. They should be the same:
+
+    >>> def read_dir(path):
+    ...     data = {}
+    ...     lpath = len(path)
+    ...     for path, dirs, files in os.walk(path):
+    ...         for file in sorted(files):
+    ...             with open(os.path.join(path, file)) as f:
+    ...                 data[(path[lpath:], file)] = f.read()
+    ...     return data
+
+    >>> def equal(path1, path2):
+    ...     d1 = read_dir(path1)
+    ...     d2 = read_dir(path2)
+    ...     if d1 == d2:
+    ...         return
+    ...     for k, v in sorted(d1.items()):
+    ...         if k not in d2:
+    ...             print k, 'in', path1, 'but not in', path2
+    ...         elif d2[k] != v:
+    ...             print k, 'content differs'
+    ...     for k, v in sorted(d2.items()):
+    ...         if k not in d2:
+    ...             print k, 'in', path2, 'but not in', path1
+
+    >>> equal('sample', 'sample2')
+
+Let's trash sample2 a bit and try again:
+
+Extra file:
+
+    >>> mkfile('sample2/d1/wtf')
+
+Extra content:
+
+    >>> with open('sample2/d1/f1', 'a') as f:
+    ...     f.write('xxx')
+
+Less content:
+
+    >>> open('sample2/d1/d2/f1', 'w').close()
+
+Remove file:
+
+    >>> os.remove('sample2/d1/d2/f2')
+
+Now sync again and test:
+
+    >>> main([os.path.abspath('sample2'), 'test'])
+    >>> equal('sample', 'sample2')
