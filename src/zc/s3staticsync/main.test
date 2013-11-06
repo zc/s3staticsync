@@ -122,98 +122,6 @@ An easy way to empty a bucket is to sync from an empty directory. :)
     >>> list(bucket)
     []
 
-Prefix duplication
-==================
-
-Sometimes, if you've been very bad, you may need to duplicate keys.
-In a web server, you might hace rules to rewrite URLs.
-
-You can provide some prefix pairs on the command line. When adding or
-removing keys, you can add and remove duplicate paths starting with a
-given prefix to another prefix.
-
-    >>> zc.s3staticsync.main(
-    ...    [os.path.abspath('sample'), 'test',
-    ...    '=dup/', '=dup2/', 'd1/d2/=d2/',
-    ...    ])
-
-Here we duplicated everything to dup1 and dup2, and
-duplicates everything in d1/d2 to a top level d2 directory.
-
-    >>> for k in bucket:
-    ...     print k.key
-    d1/d2/f1
-    d1/d2/f3
-    d1/f1
-    d1/f3
-    d2/f1
-    d2/f3
-    dup/d1/d2/f1
-    dup/d1/d2/f3
-    dup/d1/f1
-    dup/d1/f3
-    dup/f1
-    dup/f3
-    dup2/d1/d2/f1
-    dup2/d1/d2/f3
-    dup2/d1/f1
-    dup2/d1/f3
-    dup2/f1
-    dup2/f3
-    f1
-    f3
-
-    >>> for k in bucket.list('dup/'):
-    ...     k.check('sample', 'dup/')
-
-    >>> for k in bucket.list('dup2/'):
-    ...     k.check('sample', 'dup2/')
-
-    >>> for k in bucket.list('d1/'):
-    ...     k.check('sample')
-
-Do it again, for good measure:
-
-    >>> zc.s3staticsync.main(
-    ...    [os.path.abspath('sample'), 'test',
-    ...    '=dup/', '=dup2/', 'd1/d2/=d2/',
-    ...    ])
-    >>> for k in bucket:
-    ...     print k.key
-    d1/d2/f1
-    d1/d2/f3
-    d1/f1
-    d1/f3
-    d2/f1
-    d2/f3
-    dup/d1/d2/f1
-    dup/d1/d2/f3
-    dup/d1/f1
-    dup/d1/f3
-    dup/f1
-    dup/f3
-    dup2/d1/d2/f1
-    dup2/d1/d2/f3
-    dup2/d1/f1
-    dup2/d1/f3
-    dup2/f1
-    dup2/f3
-    f1
-    f3
-
-Cleanup:
-
-    >>> zc.s3staticsync.main(
-    ...       ['empty', 'test',
-    ...       '=dup/', '=dup2/', 'd1/d2/=d2/',
-    ...       ])
-    >>> list(bucket)
-    []
-
-Important note!
-  If you change the prefix-rewriting configuration, it will only be
-  honored for new changes.
-
 Avoiding deletes
 ================
 
@@ -267,36 +175,17 @@ If the bucket name has a '/' in it, then the text after the '/' is
 added as a prefix for each item.
 
     >>> zc.s3staticsync.main(
-    ...    [os.path.abspath('sample'), 'test/x/',
-    ...    '=dup/', '=dup2/', 'd1/d2/=d2/',
-    ...    ])
+    ...    [os.path.abspath('sample'), 'test/x/'])
     >>> for k in bucket:
     ...     print k.key
     x/d1/d2/f1
     x/d1/d2/f2
     x/d1/f1
     x/d1/f2
-    x/d2/f1
-    x/d2/f2
-    x/dup/d1/d2/f1
-    x/dup/d1/d2/f2
-    x/dup/d1/f1
-    x/dup/d1/f2
-    x/dup/f1
-    x/dup/f2
-    x/dup2/d1/d2/f1
-    x/dup2/d1/d2/f2
-    x/dup2/d1/f1
-    x/dup2/d1/f2
-    x/dup2/f1
-    x/dup2/f2
     x/f1
     x/f2
 
-    >>> zc.s3staticsync.main(
-    ...    ['empty', 'test/x/',
-    ...    '=dup/', '=dup2/', 'd1/d2/=d2/',
-    ...    ])
+    >>> zc.s3staticsync.main(['empty', 'test/x/'])
     >>> list(bucket)
     []
 
@@ -309,10 +198,7 @@ modification time as of the last time we synced.
 
     >>> before = now
     >>> bucket.puts = bucket.deletes = bucket.listed = 0
-    >>> zc.s3staticsync.main(
-    ...    [os.path.abspath('sample'), 'test/x/',
-    ...    '=dup/', '=dup2/', 'd1/d2/=d2/', '-iindex'
-    ...    ])
+    >>> zc.s3staticsync.main([os.path.abspath('sample'), 'test/x/', '-iindex'])
 
 Now, we have an index file:
 
@@ -329,7 +215,7 @@ Now, we have an index file:
 Because the index didn't exist, we still listed the bucket:
 
     >>> bucket.listed, bucket.puts, bucket.deletes
-    ('x/', 20, 0)
+    ('x/', 6, 0)
 
 If we started with an index and sync in the same second that files are
 written, we sleep a second to make sure we don't miss updates.  Since
@@ -356,11 +242,10 @@ Now when we sync, we'll use the index:
     >>> before = now
     >>> bucket.puts = bucket.deletes = bucket.listed = 0
     >>> zc.s3staticsync.main(
-    ...    [os.path.abspath('sample'), 'test/x/',
-    ...    '=dup/', '=dup2/', 'd1/d2/=d2/', '-iindex'
+    ...    [os.path.abspath('sample'), 'test/x/', '-iindex'
     ...    ])
     >>> bucket.listed, bucket.puts, bucket.deletes
-    (0, 14, 10)
+    (0, 4, 3)
 
 The bucket wasn't consulted, but we still did the right updates:
 
@@ -370,20 +255,6 @@ The bucket wasn't consulted, but we still did the right updates:
     x/d1/d2/f3
     x/d1/f1
     x/d1/f3
-    x/d2/f1
-    x/d2/f3
-    x/dup/d1/d2/f1
-    x/dup/d1/d2/f3
-    x/dup/d1/f1
-    x/dup/d1/f3
-    x/dup/f1
-    x/dup/f3
-    x/dup2/d1/d2/f1
-    x/dup2/d1/d2/f3
-    x/dup2/d1/f1
-    x/dup2/d1/f3
-    x/dup2/f1
-    x/dup2/f3
     x/f1
     x/f3
 
@@ -396,12 +267,9 @@ Now, we'll update a file and sync again:
 
     >>> mkfile('sample/f3')
     >>> bucket.puts = bucket.deletes = bucket.listed = 0
-    >>> zc.s3staticsync.main(
-    ...    [os.path.abspath('sample'), 'test/x/',
-    ...    '=dup/', '=dup2/', 'd1/d2/=d2/', '-iindex'
-    ...    ])
+    >>> zc.s3staticsync.main([os.path.abspath('sample'), 'test/x/', '-iindex'])
     >>> bucket.listed, bucket.puts, bucket.deletes
-    (0, 3, 0)
+    (0, 1, 0)
 
 Because we synced in the same second we write the file, we slept a
 second:
@@ -413,10 +281,7 @@ At this point, the index has been updated, so if we sync again, there
 won't be any changes:
 
     >>> bucket.puts = bucket.deletes = bucket.listed = 0
-    >>> zc.s3staticsync.main(
-    ...    [os.path.abspath('sample'), 'test/x/',
-    ...    '=dup/', '=dup2/', 'd1/d2/=d2/', '-iindex'
-    ...    ])
+    >>> zc.s3staticsync.main([os.path.abspath('sample'), 'test/x/', '-iindex'])
     >>> bucket.listed, bucket.puts, bucket.deletes
     (0, 0, 0)
 
@@ -424,11 +289,9 @@ Sometimes, we want to read S3, to make sure we're in sync, but we
 still want to update the index.  We can add the -I option for this:
 
     >>> zc.s3staticsync.main(
-    ...    [os.path.abspath('sample'), 'test/x/',
-    ...    '=dup/', '=dup2/', 'd1/d2/=d2/', '-iindex', '-I',
-    ...    ])
+    ...    [os.path.abspath('sample'), 'test/x/', '-iindex', '-I'])
     >>> bucket.listed, bucket.puts, bucket.deletes
-    ('x/', 3, 0)
+    ('x/', 1, 0)
 
 (Note that we uploaded f3 again because, without a local index, we use
 a fudge factor and are a lot more conservative about uploading things.)
@@ -440,9 +303,7 @@ If running this from cron, you probably don't want runs to overlap.
 To avoid this, you can specify a lock file using the -l option:
 
     >>> zc.s3staticsync.main(
-    ...    [os.path.abspath('sample'), 'test/x/',
-    ...    '=dup/', '=dup2/', 'd1/d2/=d2/', '-iindex', '-llock',
-    ...    ])
+    ...    [os.path.abspath('sample'), 'test/x/', '-iindex', '-llock'])
 
     >>> os.path.exists('lock')
     True
@@ -460,9 +321,7 @@ If we lock ourselves
 Then we'll get an error is we try to sync:
 
     >>> zc.s3staticsync.main(
-    ...    [os.path.abspath('sample'), 'test/x/',
-    ...    '=dup/', '=dup2/', 'd1/d2/=d2/', '-iindex', '-llock',
-    ...    ])
+    ...    [os.path.abspath('sample'), 'test/x/', '-iindex', '-llock'])
     Traceback (most recent call last):
        ...
     LockError: Couldn't lock 'lock'
@@ -470,9 +329,7 @@ Then we'll get an error is we try to sync:
     >>> lock.close()
 
     >>> zc.s3staticsync.main(
-    ...    [os.path.abspath('sample'), 'test/x/',
-    ...    '=dup/', '=dup2/', 'd1/d2/=d2/', '-iindex', '-llock',
-    ...    ])
+    ...    [os.path.abspath('sample'), 'test/x/', '-iindex', '-llock'])
 
 S3 Errors
 =========
@@ -491,8 +348,7 @@ When using an index, if there's an error uploading to S3:
     >>> before = now
     >>> bucket.puts = bucket.deletes = bucket.listed = 0
     >>> zc.s3staticsync.main(
-    ...    [os.path.abspath('sample'), 'test/x/',
-    ...    '=dup/', '=dup2/', 'd1/d2/=d2/', '-iindex', '-llock',
+    ...    [os.path.abspath('sample'), 'test/x/', '-iindex', '-llock',
     ...    ]) # doctest: +ELLIPSIS
     uploading 1379924063 ...d1/d2/f1', retrying
     Traceback (most recent call last):
@@ -519,11 +375,10 @@ Later, hopefully, the upload will succeed:
     >>> now += 99
     >>> bucket.puts = bucket.deletes = bucket.listed = 0
     >>> zc.s3staticsync.main(
-    ...    [os.path.abspath('sample'), 'test/x/',
-    ...    '=dup/', '=dup2/', 'd1/d2/=d2/', '-iindex', '-llock',
+    ...    [os.path.abspath('sample'), 'test/x/', '-iindex', '-llock',
     ...    ]) # doctest: +ELLIPSIS
     >>> bucket.listed, bucket.puts, bucket.deletes
-    (0, 4, 0)
+    (0, 1, 0)
     >>> with open('index') as f:
     ...     print 'd1/d2/f1' in marshal.load(f)
     True
@@ -536,14 +391,13 @@ Same drill with deletes:
     >>> bucket.puts = bucket.deletes = bucket.listed = 0
     >>> before = now
     >>> zc.s3staticsync.main(
-    ...    [os.path.abspath('sample'), 'test/x/',
-    ...    '=dup/', '=dup2/', 'd1/d2/=d2/', '-iindex', '-llock',
+    ...    [os.path.abspath('sample'), 'test/x/', '-iindex', '-llock',
     ...    ]) # doctest: +ELLIPSIS
-    deleting u'x/dup/d1/d2/f1', retrying
+    deleting u'x/d1/d2/f1', retrying
     Traceback (most recent call last):
     ...
     ValueError: fail
-    processing None u'dup/d1/d2/f1'
+    processing None u'd1/d2/f1'
     Traceback (most recent call last):
     ...
     ValueError: fail

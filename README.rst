@@ -62,6 +62,11 @@ Note on AWS keys
 Changes
 *******
 
+- Removed simple prefix rewrites. We didn't need them.
+
+0.9.0 (2013-11-01)
+==================
+
 Added a *simple* restore script for restoring files from S3.  It
 can restore an entire directory or update a directory, syncing with
 S3 based on file size.

@@ -75,10 +75,6 @@ def main(args=None):
     else:
         index = None
 
-    prefixes = [arg.split('=') for arg in args if '=' in arg]
-    dests = [dest for (prefix, dest) in prefixes]
-    assert not [dest for dest in dests if not dest]
-
     args = [arg for arg in args if '=' not in arg]
 
     path, bucket_name = args
@@ -104,23 +100,16 @@ def main(args=None):
 
                 key = boto.s3.key.Key(bucket)
 
-                paths = [
-                    dest + path[len(prefix):]
-                    for (prefix, dest) in prefixes
-                    if path.startswith(prefix)
-                    ] + [path]
                 if mtime is None: # delete
                     try:
                         try:
-                            for path in paths:
-                                key.key = bucket_prefix + path
-                                key.delete()
+                            key.key = bucket_prefix + path
+                            key.delete()
                         except Exception:
                             logger.exception('deleting %r, retrying' % key.key)
                             time.sleep(9)
-                            for path in paths:
-                                key.key = bucket_prefix + path
-                                key.delete()
+                            key.key = bucket_prefix + path
+                            key.delete()
                     except Exception:
                         if index is not None:
                             # Failed to delete. Put the key back so we
@@ -141,21 +130,17 @@ def main(args=None):
                             if not now > mtime:
                                 time.sleep(1)
 
-                        key.key = bucket_prefix + paths.pop(0)
+                        key.key = bucket_prefix + path
                         path = os.path.join(base_path, path)
                         try:
                             key.set_contents_from_filename(
                                 path.encode(encoding))
-                            for path in paths:
-                                key.copy(bucket_name, bucket_prefix + path)
                         except Exception:
                             logger.exception('uploading %r %r, retrying'
                                              % (mtime, path))
                             time.sleep(9)
                             key.set_contents_from_filename(
                                 path.encode(encoding))
-                            for path in paths:
-                                key.copy(bucket_name, bucket_prefix + path)
 
                     except Exception:
                         if index is not None:
@@ -222,17 +207,6 @@ def main(args=None):
 
 
                 path = key.key[len_bucket_prefix:]
-
-                ##############################
-                # skip rewrite destinations  #
-                for dest in dests:
-                    if path.startswith(dest):
-                        path = ''
-                        break
-
-                if not path:
-                    continue
-                ##############################
 
                 if path in fs:
                     mtime = fs.pop(path)
