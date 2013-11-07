@@ -3,6 +3,7 @@
 
 import boto.s3.connection
 import boto.s3.key
+import hashlib
 import logging
 import optparse
 import os
@@ -21,6 +22,7 @@ parser.add_option('-i', '--index')
 parser.add_option('-I', '--ignore-index', action='store_true',
                   help="List the S3 bucket rather than using the index file")
 parser.add_option('-l', '--lock-file')
+parser.add_option('-g', '--generate-index-html', action="store_true")
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +52,9 @@ def time_time_from_sixtuple(tup):
     return int(time.mktime(tup[:6]+zeros))
 
 def main(args=None):
+
+    from os.path import exists, join, dirname, isdir
+
     if args == None:
         args = sys.argv[1:]
         logging.basicConfig()
@@ -67,7 +72,7 @@ def main(args=None):
     had_index = False
     s3 = {}
     if options.index:
-        if not options.ignore_index and os.path.exists(options.index):
+        if not options.ignore_index and exists(options.index):
             with open(options.index) as f:
                 s3 = marshal.load(f)
             had_index = True
@@ -75,13 +80,7 @@ def main(args=None):
     else:
         index = None
 
-    prefixes = [arg.split('=') for arg in args if '=' in arg]
-    dests = [dest for (prefix, dest) in prefixes]
-    assert not [dest for dest in dests if not dest]
-
-    args = [arg for arg in args if '=' not in arg]
-
-    path, bucket_name = args
+    src_path, bucket_name = args
 
     if '/' in bucket_name:
         bucket_name, bucket_prefix = bucket_name.split('/', 1)
@@ -93,7 +92,12 @@ def main(args=None):
     queue = Queue.Queue(maxsize=999)
     put = queue.put
 
+    generate_index_html = options.generate_index_html
+    GENERATE = object()
+    INDEX_HTML = "index.html"
+
     def worker(base_path):
+        mtime = path = 0
         while 1:
             try:
                 mtime, queued_path = queue.get()
@@ -104,29 +108,74 @@ def main(args=None):
 
                 key = boto.s3.key.Key(bucket)
 
-                paths = [
-                    dest + path[len(prefix):]
-                    for (prefix, dest) in prefixes
-                    if path.startswith(prefix)
-                    ] + [path]
                 if mtime is None: # delete
                     try:
                         try:
-                            for path in paths:
-                                key.key = bucket_prefix + path
-                                key.delete()
+                            key.key = bucket_prefix + path
+                            key.delete()
                         except Exception:
                             logger.exception('deleting %r, retrying' % key.key)
                             time.sleep(9)
-                            for path in paths:
-                                key.key = bucket_prefix + path
-                                key.delete()
+                            key.key = bucket_prefix + path
+                            key.delete()
                     except Exception:
                         if index is not None:
                             # Failed to delete. Put the key back so we
                             # try again later
                             index[queued_path] = 1
                         raise
+
+                elif mtime is GENERATE:
+                    (path, s3mtime) = path
+                    fspath = join(base_path, path)
+                    if exists(fspath):
+                        # Someone created a file since we decided to
+                        # generate one.
+                        continue
+
+                    fspath = dirname(fspath)
+                    data = "Index of "+path[:-len(INDEX_HTML)-1]
+                    data = [
+                        "<!-- generated -->",
+                        "<html><head><title>%s</title></head><body>" % data,
+                        "<h1>%s</h1>" % data,
+                        "<table>",
+                        "<tr><th>Name</th><th>Last modified</th><th>Size</th>"
+                        "</tr>",
+                        ]
+                    for name in sorted(os.listdir(fspath)):
+                        name_path = join(fspath, name)
+                        if isdir(name_path):
+                            name = name + '/'
+                            size = '-'
+                        else:
+                            size = os.stat(name_path).st_size
+                        mtime = time.ctime(os.stat(name_path).st_mtime)
+                        data.append(
+                            '<tr><td><a href="%s">%s</a></td>\n'
+                            '    <td>%s</td><td>%s</td></tr>'
+                            % (name, name, mtime, size))
+                    data.append("</table></body></html>\n")
+                    data = '\n'.join(data)
+
+                    digest = hashlib.md5(data).hexdigest()
+                    if digest != s3mtime:
+                        # Note that s3mtime is either a previous
+                        # digest or it's 0 (cus path wasn't in s3) or
+                        # it's an s3 upload time.  The test above
+                        # works in all of these cases.
+                        key.key = bucket_prefix + path
+                        key.set_metadata('generated', 'true')
+                        try:
+                            key.set_contents_from_string(data)
+                        except Exception:
+                            logger.exception('uploading generated %r, retrying'
+                                             % path)
+                            time.sleep(9)
+                            key.set_contents_from_string(data)
+
+                    if index is not None:
+                        index[path.encode(encoding)] = digest
 
                 else: # upload
                     try:
@@ -141,21 +190,17 @@ def main(args=None):
                             if not now > mtime:
                                 time.sleep(1)
 
-                        key.key = bucket_prefix + paths.pop(0)
-                        path = os.path.join(base_path, path)
+                        key.key = bucket_prefix + path
+                        path = join(base_path, path)
                         try:
                             key.set_contents_from_filename(
                                 path.encode(encoding))
-                            for path in paths:
-                                key.copy(bucket_name, bucket_prefix + path)
                         except Exception:
                             logger.exception('uploading %r %r, retrying'
                                              % (mtime, path))
                             time.sleep(9)
                             key.set_contents_from_filename(
                                 path.encode(encoding))
-                            for path in paths:
-                                key.copy(bucket_name, bucket_prefix + path)
 
                     except Exception:
                         if index is not None:
@@ -170,7 +215,7 @@ def main(args=None):
             finally:
                 queue.task_done()
 
-    workers = [thread(worker, path)
+    workers = [thread(worker, src_path)
                for i in range(options.worker_threads)]
 
     # As we build up the 2 dicts, we try to identify cases we can
@@ -180,10 +225,15 @@ def main(args=None):
 
     def listfs(path, base):
         for name in sorted(os.listdir(path)):
-            pname = os.path.join(path, name)
-            rname = os.path.join(base, name)
-            if os.path.isdir(pname):
+            pname = join(path, name)
+            rname = join(base, name)
+            if isdir(pname):
                 listfs(pname, rname)
+                if generate_index_html and not exists(join(pname, INDEX_HTML)):
+                    key = rname.decode(encoding)+'/'+INDEX_HTML
+                    # We don't short circuit by checking s3 here.
+                    # We'll do that at the end.
+                    fs[key] = -1
             else:
                 try:
                     mtime = time_time_from_sixtuple(
@@ -198,12 +248,13 @@ def main(args=None):
                 if key in s3:
                     # We can go ahead and do the check
                     s3mtime = s3.pop(key)
-                    if mtime > s3mtime:
+                    if (isinstance(s3mtime, basestring) # generated
+                        or mtime > s3mtime):
                         put((mtime, key))
                 else:
                     fs[key] = mtime
 
-    fs_thread = thread(listfs, path, '')
+    fs_thread = thread(listfs, src_path, '')
 
     s3conn = boto.s3.connection.S3Connection()
     bucket = s3conn.get_bucket(bucket_name)
@@ -212,8 +263,8 @@ def main(args=None):
         @thread
         def s3_thread():
             for key in bucket.list(bucket_prefix):
-                s3mtime = time_time_from_sixtuple(parse_time(key.last_modified))
 
+                s3mtime = time_time_from_sixtuple(parse_time(key.last_modified))
 
                 # subtract a fudge factor to account for crappy clocks and bias
                 # caused by delat between start of upload and
@@ -223,21 +274,13 @@ def main(args=None):
 
                 path = key.key[len_bucket_prefix:]
 
-                ##############################
-                # skip rewrite destinations  #
-                for dest in dests:
-                    if path.startswith(dest):
-                        path = ''
-                        break
-
-                if not path:
-                    continue
-                ##############################
-
                 if path in fs:
                     mtime = fs.pop(path)
                     if mtime > s3mtime:
                         put((mtime, path))
+                    elif mtime == -1:
+                        # generate marker. Put it back.
+                        fs[path] = -1
                 else:
                     s3[path] = s3mtime
 
@@ -247,8 +290,14 @@ def main(args=None):
 
     for (path, mtime) in fs.iteritems():
         s3mtime = s3.pop(path, 0)
-        if mtime > s3mtime:
-            put((mtime, path))
+        if mtime == -1:
+            # We generate unconditionally, because the content
+            # is dynamic.  We pass aling the old s3mtime, which might
+            # be an old digest to see if we actually have to update s3.
+            put((GENERATE, (path, s3mtime)))
+        else:
+            if mtime > s3mtime:
+                put((mtime, path))
 
     if not options.no_delete:
         for path in s3:

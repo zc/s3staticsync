@@ -27,6 +27,7 @@ def thread(func, *args):
     return t
 
 DOWNLOAD, DELETE = 'download', None
+INDEX_HTML = 'index.html'
 
 def main(args=None):
     if args == None:
@@ -61,20 +62,20 @@ def main(args=None):
                 if path is None:
                     return
 
-                key = boto.s3.key.Key(bucket)
+                fspath = os.path.join(base_path, path)
 
                 if op is DELETE:
                     try:
-                        os.remove(path)
+                        os.remove(fspath)
                     except Exception:
                         raise
 
                 else: # download
                     try:
+                        key = boto.s3.key.Key(bucket)
                         key.key = bucket_prefix + path
-                        path = os.path.join(base_path, path)
                         try:
-                            parent = os.path.dirname(path)
+                            parent = os.path.dirname(fspath)
                             if not os.path.exists(parent):
                                 try:
                                     os.makedirs(parent)
@@ -82,11 +83,14 @@ def main(args=None):
                                     if not os.path.exists(parent):
                                         raise
 
-                            key.get_contents_to_filename(path.encode(encoding))
+                            key.get_contents_to_filename(
+                                fspath.encode(encoding))
                         except Exception:
-                            logger.exception('downloading %r, retrying' % path)
+                            logger.exception(
+                                'downloading %r, retrying' % fspath)
                             time.sleep(9)
-                            key.get_contents_to_filename(path.encode(encoding))
+                            key.get_contents_to_filename(
+                                fspath.encode(encoding))
 
                     except Exception:
                         raise
@@ -142,6 +146,10 @@ def main(args=None):
                 if size != s3size:
                     put((DOWNLOAD, path))
             else:
+                if path.endswith(INDEX_HTML) and path.endswith("/"+INDEX_HTML):
+                    key = bucket.get_key(path)
+                    if key.get_metadata('generated') == 'true':
+                        continue
                 s3[path] = s3size
 
     s3_thread.join()

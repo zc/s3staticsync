@@ -26,7 +26,7 @@ We'll sync to our faux bucket:
     >>> import zc.s3staticsync
 
     >>> now += 30
-    >>> zc.s3staticsync.main([os.path.abspath('sample'), 'test'])
+    >>> zc.s3staticsync.main([os.path.abspath('sample'), 'test', '-g'])
 
 Now, we'll create a new directory and restore to it:
 
@@ -58,7 +58,7 @@ Let's compare sample and sample2. They should be the same:
     ...         elif d2[k] != v:
     ...             print k, 'content differs'
     ...     for k, v in sorted(d2.items()):
-    ...         if k not in d2:
+    ...         if k not in d1:
     ...             print k, 'in', path2, 'but not in', path1
 
     >>> equal('sample', 'sample2')
