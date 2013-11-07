@@ -64,6 +64,9 @@ Changes
 
 - Removed simple prefix rewrites. We didn't need them.
 
+- Fixed: the restore script didn't remove extra files from the
+  destination directory.
+
 0.9.0 (2013-11-01)
 ==================
 
