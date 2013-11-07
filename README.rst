@@ -62,6 +62,11 @@ Note on AWS keys
 Changes
 *******
 
+1.0.2 (2013-11-08)
+==================
+
+- Fixed: index.html files included dot files.
+
 1.0.1 (2013-11-08)
 ==================
 
