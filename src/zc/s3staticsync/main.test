@@ -409,3 +409,210 @@ Same drill with deletes:
     True
     >>> 8.9 < (now - before) < 9.1
     True
+
+    >>> bucket.fail = False
+    >>> zc.s3staticsync.main(
+    ...    [os.path.abspath('sample'), 'test/x/', '-iindex', '-llock',
+    ...    ]) # doctest: +ELLIPSIS
+
+index.html generation
+=====================
+
+If you're migrating from an apache web server to S3, you may want
+automatically generated index files.  In directories that already have
+index files, we want them to be retained.  We'll create an index
+manually to show that it isn't overwritten:
+
+    >>> mkfile('sample/d1/index.html', 'manual index')
+
+Now, we'll sync again, but this time, we'll ask (-g) for index.html files
+to be generated:
+
+    >>> zc.s3staticsync.main(
+    ...    [os.path.abspath('sample'), 'test/x/', '-iindex', '-llock', '-g'])
+    >>> now += 3000
+
+    >>> for k in bucket:
+    ...     print k.key
+    x/d1/d2/f3
+    x/d1/d2/index.html
+    x/d1/f1
+    x/d1/f3
+    x/d1/index.html
+    x/f1
+    x/f3
+
+Notice we got an index file generated in d1/d2.
+
+    >>> print bucket.data['x/d1/d2/index.html'][0],
+    <!-- generated -->
+    <html><head><title>Index of d1/d2</title></head><body>
+    <h1>Index of d1/d2</h1>
+    <table>
+    <tr><th>Name</th><th>Last modified</th><th>Size</th></tr>
+    <tr><td><a href="f3">f3</a></td>
+        <td>Sun Sep 22 22:14:22 2013</td><td>40726</td></tr>
+    </table></body></html>
+
+Our original index is preserved:
+
+    >>> print bucket.data['x/d1/index.html'][0]
+    manual index
+
+If we add a file and a directory to d1/d2, it will be reflected in th index:
+
+    >>> mkfile('sample/d1/d2/f1')
+    >>> mkfile('sample/d1/d2/d3/f1')
+    >>> now += 3000
+    >>> zc.s3staticsync.main(
+    ...    [os.path.abspath('sample'), 'test/x/', '-iindex', '-llock', '-g'])
+
+    >>> for k in bucket:
+    ...     print k.key
+    x/d1/d2/d3/f1
+    x/d1/d2/d3/index.html
+    x/d1/d2/f1
+    x/d1/d2/f3
+    x/d1/d2/index.html
+    x/d1/f1
+    x/d1/f3
+    x/d1/index.html
+    x/f1
+    x/f3
+
+Notice we got an index file generated in d1/d2.
+
+    >>> print bucket.data['x/d1/d2/index.html'][0], # doctest: +ELLIPSIS
+    <!-- generated -->
+    <html><head><title>Index of d1/d2</title></head><body>
+    <h1>Index of d1/d2</h1>
+    <table>
+    <tr><th>Name</th><th>Last modified</th><th>Size</th></tr>
+    <tr><td><a href="d3/">d3/</a></td>
+        <td>...</td><td>-</td></tr>
+    <tr><td><a href="f1">f1</a></td>
+        <td>Mon Sep 23 00:09:39 2013</td><td>50628</td></tr>
+    <tr><td><a href="f3">f3</a></td>
+        <td>Sun Sep 22 22:14:22 2013</td><td>40726</td></tr>
+    </table></body></html>
+
+Our original index is still preserved:
+
+    >>> print bucket.data['x/d1/index.html'][0]
+    manual index
+
+If we remove a directory, the generated index file will be removed from s3:
+
+    >>> os.remove('sample/d1/d2/d3/f1')
+    >>> os.rmdir('sample/d1/d2/d3')
+    >>> zc.s3staticsync.main(
+    ...    [os.path.abspath('sample'), 'test/x/', '-iindex', '-llock', '-g'])
+
+    >>> for k in bucket:
+    ...     print k.key
+    x/d1/d2/f1
+    x/d1/d2/f3
+    x/d1/d2/index.html
+    x/d1/f1
+    x/d1/f3
+    x/d1/index.html
+    x/f1
+    x/f3
+
+We can replace generated indexes:
+
+    >>> mkfile('sample/d1/d2/index.html', 'manual index d1/d2')
+    >>> zc.s3staticsync.main(
+    ...    [os.path.abspath('sample'), 'test/x/', '-iindex', '-llock', '-g',
+    ...    ]) # doctest: +ELLIPSIS
+    >>> print bucket.data['x/d1/d2/index.html'][0],
+    manual index d1/d2
+
+    >>> os.remove('sample/d1/d2/index.html')
+    >>> zc.s3staticsync.main(
+    ...    [os.path.abspath('sample'), 'test/x/', '-iindex', '-llock', '-g',
+    ...    ]) # doctest: +ELLIPSIS
+    >>> print bucket.data['x/d1/d2/index.html'][0], # doctest: +ELLIPSIS
+    <!-- generated -->
+    <html><head><title>Index of d1/d2</title></head><body>
+    <h1>Index of d1/d2</h1>
+    ...
+
+Because we're using an file index, we can avoid uploading a generated
+index is it hasn't changed. This is important for avoiding S3
+charges. Let's verify this:
+
+    >>> now += 99
+    >>> bucket.puts = bucket.deletes = bucket.listed = 0
+    >>> zc.s3staticsync.main(
+    ...    [os.path.abspath('sample'), 'test/x/', '-iindex', '-llock', '-g',
+    ...    ]) # doctest: +ELLIPSIS
+    >>> bucket.listed, bucket.puts, bucket.deletes
+    (0, 0, 0)
+
+
+We can ignore the existing index:
+
+    >>> zc.s3staticsync.main(
+    ...    [os.path.abspath('sample'), 'test/x/', '-iindex', '-llock', '-gI'])
+
+    >>> for k in bucket:
+    ...     print k.key
+    x/d1/d2/f1
+    x/d1/d2/f3
+    x/d1/d2/index.html
+    x/d1/f1
+    x/d1/f3
+    x/d1/index.html
+    x/f1
+    x/f3
+
+    >>> print bucket.data['x/d1/index.html'][0]
+    manual index
+
+    >>> print bucket.data['x/d1/d2/index.html'][0], # doctest: +ELLIPSIS
+    <!-- generated -->
+    <html><head><title>Index of d1/d2</title></head><body>
+    <h1>Index of d1/d2</h1>
+    ...
+
+Or we can avoid using an index altogether:
+
+    >>> zc.s3staticsync.main(
+    ...    [os.path.abspath('sample'), 'test/x/', '-g'])
+
+    >>> now += 3000
+
+However, since we're ignoring the index, we'll end up putting the
+index to S3:
+
+    >>> bucket.puts = bucket.deletes = bucket.listed = 0
+    >>> zc.s3staticsync.main(
+    ...    [os.path.abspath('sample'), 'test/x/', '-g'])
+    >>> bucket.listed, bucket.puts, bucket.deletes
+    ('x/', 1, 0)
+
+Let's place a generated w static and static w generated and make sure
+we still get the correct behavior:
+
+    >>> mkfile('sample/d1/d2/index.html', 'index of d1/d2')
+    >>> os.remove('sample/d1/index.html')
+    >>> zc.s3staticsync.main(
+    ...    [os.path.abspath('sample'), 'test/x/', '-g'])
+
+    >>> print bucket.data['x/d1/index.html'][0], # doctest: +ELLIPSIS
+    <!-- generated -->
+    <html><head><title>Index of d1</title></head><body>
+    <h1>Index of d1</h1>
+    <table>
+    <tr><th>Name</th><th>Last modified</th><th>Size</th></tr>
+    <tr><td><a href="d2/">d2/</a></td>
+        <td>...</td><td>-</td></tr>
+    <tr><td><a href="f1">f1</a></td>
+        <td>Sun Sep 22 17:37:12 2013</td><td>13337</td></tr>
+    <tr><td><a href="f3">f3</a></td>
+        <td>Sun Sep 22 22:14:22 2013</td><td>47519</td></tr>
+    </table></body></html>
+
+    >>> print bucket.data['x/d1/d2/index.html'][0], # doctest: +ELLIPSIS
+    index of d1/d2

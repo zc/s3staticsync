@@ -62,6 +62,9 @@ Note on AWS keys
 Changes
 *******
 
+- Added generation of index.html files in S3 for directories without
+  them on the file system.
+
 - Removed simple prefix rewrites. We didn't need them.
 
 - Fixed: the restore script didn't remove extra files from the

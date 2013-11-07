@@ -27,6 +27,7 @@ def thread(func, *args):
     return t
 
 DOWNLOAD, DELETE = 'download', None
+INDEX_HTML = 'index.html'
 
 def main(args=None):
     if args == None:
@@ -145,6 +146,10 @@ def main(args=None):
                 if size != s3size:
                     put((DOWNLOAD, path))
             else:
+                if path.endswith(INDEX_HTML) and path.endswith("/"+INDEX_HTML):
+                    key = bucket.get_key(path)
+                    if key.get_metadata('generated') == 'true':
+                        continue
                 s3[path] = s3size
 
     s3_thread.join()
