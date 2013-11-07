@@ -23,7 +23,7 @@ import zope.testing.setupstack
 class Bucket:
 
     puts = deletes = gets = 0
-    fail = False
+    fail = debug = False
 
     def __init__(self, connection):
         self.connection = connection
@@ -36,18 +36,33 @@ class Bucket:
             if path.startswith(prefix):
                 k = Key(self)
                 k.key = path
-                k.data, k.last_modified = self.data[path]
+                k.data, k.last_modified = self.data[path][:2]
                 yield k
 
     __iter__ = list
+
+    def get_key(self, path):
+        k = Key(self)
+        k.key = path
+        k.data, k.last_modified, k.metadata = self.data[path]
+        return k
 
 class Key:
 
     def __init__(self, bucket):
         self.bucket = bucket
+        self.metadata = {}
+
+    def set_metadata(self, k, v):
+        self.metadata[k] = v
+
+    def get_metadata(self, k):
+        return self.metadata[k]
 
     def set_contents_from_filename(self, filename):
         self.bucket.puts += 1
+        if self.bucket.debug:
+            print 'set_contents_from_filename', filename
 
         if self.bucket.fail:
             raise ValueError("fail")
@@ -58,8 +73,21 @@ class Key:
             )
         with open(filename) as f:
             self.bucket.data[self.key] = (
-                f.read(), self.last_modified)
+                f.read(), self.last_modified, self.metadata)
 
+    def set_contents_from_string(self, data):
+        self.bucket.puts += 1
+        if self.bucket.debug:
+            print 'set_contents_from_string', data, self.bucket.puts
+
+        if self.bucket.fail:
+            raise ValueError("fail")
+
+        self.last_modified = (
+            "%4.4d-%2.2d-%2.2dT%2.2d:%2.2d:%2.2d.123"
+            % time.gmtime(time.time())[:6]
+            )
+        self.bucket.data[self.key] = data, self.last_modified, self.metadata
 
     def get_contents_to_filename(self, filename):
         self.bucket.gets += 1
@@ -79,13 +107,6 @@ class Key:
             if not f.read() == self.data:
                 print 'missmatched data', self.key
 
-    def copy(self, dest_bucket, dest_path):
-        dest_bucket = self.bucket.connection.get_bucket(dest_bucket)
-        dest_bucket.puts += 1
-        if self.bucket.fail:
-            raise ValueError("fail")
-        dest_bucket.data[dest_path] = self.bucket.data[self.key]
-
     def delete(self):
         self.bucket.deletes += 1
         if self.bucket.fail:
@@ -100,13 +121,16 @@ class S3Connection:
     def get_bucket(self, name):
         return self.buckets[name]
 
-def mkfile(path):
+def mkfile(path, data=None):
+    if data is None:
+        data = ''.join(chr(random.randint(0,255))
+                       for i in range(random.randint(0, 1<<16)))
     d = os.path.dirname(path)
     if not os.path.exists(d):
         os.makedirs(d)
+        os.utime(d, (time.time(), time.time()))
     with open(path, 'w') as f:
-        f.write(''.join(chr(random.randint(0,255))
-                        for i in range(random.randint(0, 1<<16))))
+        f.write(data)
     os.utime(path, (time.time(), time.time()))
 
 def exception(s):
@@ -114,6 +138,7 @@ def exception(s):
     traceback.print_exc(file=sys.stdout)
 
 def setup(test):
+    random.seed(0)
     zope.testing.setupstack.setUpDirectory(test)
     s3conn = S3Connection()
     zope.testing.setupstack.context_manager(
