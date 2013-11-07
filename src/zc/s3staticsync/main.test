@@ -459,7 +459,7 @@ Our original index is preserved:
     >>> print bucket.data['x/d1/index.html'][0]
     manual index
 
-If we add a file and a directory to d1/d2, it will be reflected in th index:
+If we add a file and a directory to d1/d2, it will be reflected in the index:
 
     >>> mkfile('sample/d1/d2/f1')
     >>> mkfile('sample/d1/d2/d3/f1')
