@@ -447,8 +447,7 @@ Notice we got an index file generated in d1/d2.
     >>> print bucket.data['x/d1/d2/index.html'][0],
     <!-- generated -->
     <html><head><title>Index of d1/d2</title></head><body>
-    <h1>Index of d1/d2</h1>
-    <table>
+    <h1>Index of d1/d2</h1><table>
     <tr><th>Name</th><th>Last modified</th><th>Size</th></tr>
     <tr><td><a href="f3">f3</a></td>
         <td>Sun Sep 22 22:14:22 2013</td><td>40726</td></tr>
@@ -485,8 +484,7 @@ Notice we got an index file generated in d1/d2.
     >>> print bucket.data['x/d1/d2/index.html'][0], # doctest: +ELLIPSIS
     <!-- generated -->
     <html><head><title>Index of d1/d2</title></head><body>
-    <h1>Index of d1/d2</h1>
-    <table>
+    <h1>Index of d1/d2</h1><table>
     <tr><th>Name</th><th>Last modified</th><th>Size</th></tr>
     <tr><td><a href="d3/">d3/</a></td>
         <td>...</td><td>-</td></tr>
@@ -535,7 +533,7 @@ We can replace generated indexes:
     >>> print bucket.data['x/d1/d2/index.html'][0], # doctest: +ELLIPSIS
     <!-- generated -->
     <html><head><title>Index of d1/d2</title></head><body>
-    <h1>Index of d1/d2</h1>
+    <h1>Index of d1/d2</h1><table>
     ...
 
 Because we're using an file index, we can avoid uploading a generated
@@ -573,7 +571,7 @@ We can ignore the existing index:
     >>> print bucket.data['x/d1/d2/index.html'][0], # doctest: +ELLIPSIS
     <!-- generated -->
     <html><head><title>Index of d1/d2</title></head><body>
-    <h1>Index of d1/d2</h1>
+    <h1>Index of d1/d2</h1><table>
     ...
 
 Or we can avoid using an index altogether:
@@ -603,8 +601,7 @@ we still get the correct behavior:
     >>> print bucket.data['x/d1/index.html'][0], # doctest: +ELLIPSIS
     <!-- generated -->
     <html><head><title>Index of d1</title></head><body>
-    <h1>Index of d1</h1>
-    <table>
+    <h1>Index of d1</h1><table>
     <tr><th>Name</th><th>Last modified</th><th>Size</th></tr>
     <tr><td><a href="d2/">d2/</a></td>
         <td>...</td><td>-</td></tr>

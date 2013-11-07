@@ -75,8 +75,10 @@ class Key:
             self.bucket.data[self.key] = (
                 f.read(), self.last_modified, self.metadata)
 
-    def set_contents_from_string(self, data):
+    def set_contents_from_string(self, data, headers):
         self.bucket.puts += 1
+        if headers.items() != [('Content-Type', 'text/html')]:
+            raise AssertionError("bad headers", headers)
         if self.bucket.debug:
             print 'set_contents_from_string', data, self.bucket.puts
 

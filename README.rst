@@ -62,6 +62,15 @@ Note on AWS keys
 Changes
 *******
 
+1.0.1 (2013-11-08)
+==================
+
+- Fixed: Content-Type wasn't set for generated index.html files.
+
+         (Also tweaked html layout to force new index.html files to be
+         sent.
+
+
 1.0.0 (2013-11-08)
 ==================
 

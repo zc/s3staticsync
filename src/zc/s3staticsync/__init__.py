@@ -138,8 +138,7 @@ def main(args=None):
                     data = [
                         "<!-- generated -->",
                         "<html><head><title>%s</title></head><body>" % data,
-                        "<h1>%s</h1>" % data,
-                        "<table>",
+                        "<h1>%s</h1><table>" % data,
                         "<tr><th>Name</th><th>Last modified</th><th>Size</th>"
                         "</tr>",
                         ]
@@ -167,12 +166,18 @@ def main(args=None):
                         key.key = bucket_prefix + path
                         key.set_metadata('generated', 'true')
                         try:
-                            key.set_contents_from_string(data)
+                            key.set_contents_from_string(
+                                data,
+                                headers={'Content-Type': 'text/html'},
+                                )
                         except Exception:
                             logger.exception('uploading generated %r, retrying'
                                              % path)
                             time.sleep(9)
-                            key.set_contents_from_string(data)
+                            key.set_contents_from_string(
+                                data,
+                                headers={'Content-Type': 'text/html'},
+                                )
 
                     if index is not None:
                         index[path.encode(encoding)] = digest
