@@ -1,5 +1,5 @@
 Name: s3staticsync
-Version: 0
+Version: 1.0.2
 Release: 1
 
 Summary: S3 Static Sync
