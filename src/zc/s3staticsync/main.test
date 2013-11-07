@@ -424,6 +424,7 @@ index files, we want them to be retained.  We'll create an index
 manually to show that it isn't overwritten:
 
     >>> mkfile('sample/d1/index.html', 'manual index')
+    >>> mkfile('sample/d1/d2/.spam', 'no index me')
 
 Now, we'll sync again, but this time, we'll ask (-g) for index.html files
 to be generated:
@@ -434,6 +435,7 @@ to be generated:
 
     >>> for k in bucket:
     ...     print k.key
+    x/d1/d2/.spam
     x/d1/d2/f3
     x/d1/d2/index.html
     x/d1/f1
@@ -468,6 +470,7 @@ If we add a file and a directory to d1/d2, it will be reflected in the index:
 
     >>> for k in bucket:
     ...     print k.key
+    x/d1/d2/.spam
     x/d1/d2/d3/f1
     x/d1/d2/d3/index.html
     x/d1/d2/f1
@@ -508,6 +511,7 @@ If we remove a directory, the generated index file will be removed from s3:
 
     >>> for k in bucket:
     ...     print k.key
+    x/d1/d2/.spam
     x/d1/d2/f1
     x/d1/d2/f3
     x/d1/d2/index.html
@@ -556,6 +560,7 @@ We can ignore the existing index:
 
     >>> for k in bucket:
     ...     print k.key
+    x/d1/d2/.spam
     x/d1/d2/f1
     x/d1/d2/f3
     x/d1/d2/index.html

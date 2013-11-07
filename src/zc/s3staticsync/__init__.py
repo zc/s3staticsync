@@ -143,6 +143,8 @@ def main(args=None):
                         "</tr>",
                         ]
                     for name in sorted(os.listdir(fspath)):
+                        if name.startswith('.'):
+                            continue # don't index dot files
                         name_path = join(fspath, name)
                         if isdir(name_path):
                             name = name + '/'
