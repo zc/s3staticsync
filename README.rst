@@ -62,6 +62,8 @@ Note on AWS keys
 Changes
 *******
 
+- Fixed: directories with weird file names broke index generation.
+
 1.0.2 (2013-11-08)
 ==================
 
