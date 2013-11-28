@@ -127,7 +127,7 @@ def main(args=None):
 
                 elif mtime is GENERATE:
                     (path, s3mtime) = path
-                    fspath = join(base_path, path)
+                    fspath = join(base_path, path.encode(encoding))
                     if exists(fspath):
                         # Someone created a file since we decided to
                         # generate one.
@@ -152,6 +152,7 @@ def main(args=None):
                         else:
                             size = os.stat(name_path).st_size
                         mtime = time.ctime(os.stat(name_path).st_mtime)
+                        name = name.decode(encoding)
                         data.append(
                             '<tr><td><a href="%s">%s</a></td>\n'
                             '    <td>%s</td><td>%s</td></tr>'
@@ -159,7 +160,7 @@ def main(args=None):
                     data.append("</table></body></html>\n")
                     data = '\n'.join(data)
 
-                    digest = hashlib.md5(data).hexdigest()
+                    digest = hashlib.md5(data.encode(encoding)).hexdigest()
                     if digest != s3mtime:
                         # Note that s3mtime is either a previous
                         # digest or it's 0 (cus path wasn't in s3) or
