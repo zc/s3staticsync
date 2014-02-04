@@ -189,7 +189,7 @@ def main(args=None):
                                 )
 
                         if s3mtime:
-                            # upadte (if it was add, mtime would be 0)
+                            # update (if it was add, mtime would be 0)
                             if cloudfront:
                                 invalidations.append(path)
 
