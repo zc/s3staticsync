@@ -23,6 +23,9 @@ parser.add_option('-I', '--ignore-index', action='store_true',
                   help="List the S3 bucket rather than using the index file")
 parser.add_option('-l', '--lock-file')
 parser.add_option('-g', '--generate-index-html', action="store_true")
+parser.add_option(
+    '-c', '--cloudfront',
+    help="Invalidate the given cloudfront distribution on updates and deletes.")
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +94,9 @@ def main(args=None):
     fs = {}
     queue = Queue.Queue(maxsize=999)
     put = queue.put
+
+    cloudfront = options.cloudfront
+    invalidations = []
 
     generate_index_html = options.generate_index_html
     GENERATE = object()
@@ -182,8 +188,13 @@ def main(args=None):
                                 headers={'Content-Type': 'text/html'},
                                 )
 
+                        if s3mtime:
+                            # update (if it was add, mtime would be 0)
+                            if cloudfront:
+                                invalidations.append(path)
+
                     if index is not None:
-                        index[path.encode(encoding)] = digest
+                        index[path] = digest
 
                 else: # upload
                     try:
@@ -259,6 +270,8 @@ def main(args=None):
                     if (isinstance(s3mtime, basestring) # generated
                         or mtime > s3mtime):
                         put((mtime, key))
+                        if cloudfront:
+                            invalidations.append(key)
                 else:
                     fs[key] = mtime
 
@@ -286,6 +299,8 @@ def main(args=None):
                     mtime = fs.pop(path)
                     if mtime > s3mtime:
                         put((mtime, path))
+                        if cloudfront:
+                            invalidations.append(path)
                     elif mtime == -1:
                         # generate marker. Put it back.
                         fs[path] = -1
@@ -300,22 +315,37 @@ def main(args=None):
         s3mtime = s3.pop(path, 0)
         if mtime == -1:
             # We generate unconditionally, because the content
-            # is dynamic.  We pass aling the old s3mtime, which might
+            # is dynamic.  We pass along the old s3mtime, which might
             # be an old digest to see if we actually have to update s3.
             put((GENERATE, (path, s3mtime)))
         else:
             if mtime > s3mtime:
                 put((mtime, path))
 
+                if s3mtime:
+                    # update (if it was add, mtime would be 0)
+                    if cloudfront:
+                        invalidations.append(path)
+
     if not options.no_delete:
         for path in s3:
             put((None, path))
+            if cloudfront:
+                invalidations.append(path)
 
     queue.join()
 
     if index is not None:
         with open(options.index, 'w') as f:
             marshal.dump(index, f)
+
+    if cloudfront:
+        cfconn = boto.connect_cloudfront()
+        time.sleep(9) # give a little extra type for the s3 updates to propigate
+        for start in range(0, len(invalidations), 1000):
+            cfconn.create_invalidation_request(
+                cloudfront,
+                [bucket_prefix+p for p in invalidations[start:start+1000]])
 
     if lock is not None:
         lock.close()

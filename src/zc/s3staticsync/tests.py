@@ -123,6 +123,11 @@ class S3Connection:
     def get_bucket(self, name):
         return self.buckets[name]
 
+class Cloudfront:
+
+    def create_invalidation_request(self, cfid, paths):
+        print 'invalidated', cfid, paths
+
 def mkfile(path, data=None):
     if data is None:
         data = ''.join(chr(random.randint(0,255))
@@ -161,6 +166,9 @@ def setup(test):
         test.globs['now'] += s
     zope.testing.setupstack.context_manager(
         test, mock.patch('time.sleep', side_effect=sleep))
+
+    zope.testing.setupstack.context_manager(
+        test, mock.patch("boto.connect_cloudfront", side_effect=Cloudfront))
 
 def test_suite():
     return doctest.DocFileSuite(

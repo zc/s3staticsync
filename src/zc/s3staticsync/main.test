@@ -25,7 +25,8 @@ We'll sync to our faux bucket:
     >>> import zc.s3staticsync
 
     >>> now += 30
-    >>> zc.s3staticsync.main([os.path.abspath('sample'), 'test'])
+    >>> from os.path import abspath
+    >>> zc.s3staticsync.main([abspath('sample'), 'test'])
     ... # doctest: +ELLIPSIS
     bad file 'd1/hahaha'
     Traceback (most recent call last):
@@ -60,7 +61,7 @@ We did 6 puts and no deletes:
 Time passes and we so it all again:
 
     >>> now += 1800
-    >>> zc.s3staticsync.main([os.path.abspath('sample'), 'test'])
+    >>> zc.s3staticsync.main([abspath('sample'), 'test'])
 
 Nothing should have been put or deleted:
 
@@ -80,7 +81,7 @@ Nothing should have been put or deleted:
     >>> os.remove('sample/d1/f2')
     >>> os.remove('sample/d1/d2/f2')
 
-    >>> zc.s3staticsync.main([os.path.abspath('sample'), 'test'])
+    >>> zc.s3staticsync.main([abspath('sample'), 'test'])
 
     >>> for k in bucket:
     ...     print k.key
@@ -101,14 +102,14 @@ sync, we add a fudge factor to the modification time. This causes
 newly modified files to be uploaded twice:
 
     >>> now += 1800
-    >>> zc.s3staticsync.main([os.path.abspath('sample'), 'test'])
+    >>> zc.s3staticsync.main([abspath('sample'), 'test'])
     >>> bucket.puts, bucket.deletes
     (14, 3)
 
 But only twice:
 
     >>> now += 1800
-    >>> zc.s3staticsync.main([os.path.abspath('sample'), 'test'])
+    >>> zc.s3staticsync.main([abspath('sample'), 'test'])
     >>> bucket.puts, bucket.deletes
     (14, 3)
 
@@ -128,7 +129,7 @@ Avoiding deletes
 If you supply the -D option, no keys in S3 will be deleted:
 
     >>> zc.s3staticsync.main(
-    ...    [os.path.abspath('sample'), 'test',
+    ...    [abspath('sample'), 'test',
     ...    ])
     >>> for k in bucket:
     ...     print k.key
@@ -150,7 +151,7 @@ If you supply the -D option, no keys in S3 will be deleted:
 
 
     >>> zc.s3staticsync.main(
-    ...    [os.path.abspath('sample'), 'test', '-D'
+    ...    [abspath('sample'), 'test', '-D'
     ...    ])
     >>> for k in bucket:
     ...     print k.key
@@ -175,7 +176,7 @@ If the bucket name has a '/' in it, then the text after the '/' is
 added as a prefix for each item.
 
     >>> zc.s3staticsync.main(
-    ...    [os.path.abspath('sample'), 'test/x/'])
+    ...    [abspath('sample'), 'test/x/'])
     >>> for k in bucket:
     ...     print k.key
     x/d1/d2/f1
@@ -198,7 +199,7 @@ modification time as of the last time we synced.
 
     >>> before = now
     >>> bucket.puts = bucket.deletes = bucket.listed = 0
-    >>> zc.s3staticsync.main([os.path.abspath('sample'), 'test/x/', '-iindex'])
+    >>> zc.s3staticsync.main([abspath('sample'), 'test/x/', '-iindex'])
 
 Now, we have an index file:
 
@@ -242,7 +243,7 @@ Now when we sync, we'll use the index:
     >>> before = now
     >>> bucket.puts = bucket.deletes = bucket.listed = 0
     >>> zc.s3staticsync.main(
-    ...    [os.path.abspath('sample'), 'test/x/', '-iindex'
+    ...    [abspath('sample'), 'test/x/', '-iindex'
     ...    ])
     >>> bucket.listed, bucket.puts, bucket.deletes
     (0, 4, 3)
@@ -267,7 +268,7 @@ Now, we'll update a file and sync again:
 
     >>> mkfile('sample/f3')
     >>> bucket.puts = bucket.deletes = bucket.listed = 0
-    >>> zc.s3staticsync.main([os.path.abspath('sample'), 'test/x/', '-iindex'])
+    >>> zc.s3staticsync.main([abspath('sample'), 'test/x/', '-iindex'])
     >>> bucket.listed, bucket.puts, bucket.deletes
     (0, 1, 0)
 
@@ -281,7 +282,7 @@ At this point, the index has been updated, so if we sync again, there
 won't be any changes:
 
     >>> bucket.puts = bucket.deletes = bucket.listed = 0
-    >>> zc.s3staticsync.main([os.path.abspath('sample'), 'test/x/', '-iindex'])
+    >>> zc.s3staticsync.main([abspath('sample'), 'test/x/', '-iindex'])
     >>> bucket.listed, bucket.puts, bucket.deletes
     (0, 0, 0)
 
@@ -289,7 +290,7 @@ Sometimes, we want to read S3, to make sure we're in sync, but we
 still want to update the index.  We can add the -I option for this:
 
     >>> zc.s3staticsync.main(
-    ...    [os.path.abspath('sample'), 'test/x/', '-iindex', '-I'])
+    ...    [abspath('sample'), 'test/x/', '-iindex', '-I'])
     >>> bucket.listed, bucket.puts, bucket.deletes
     ('x/', 1, 0)
 
@@ -303,7 +304,7 @@ If running this from cron, you probably don't want runs to overlap.
 To avoid this, you can specify a lock file using the -l option:
 
     >>> zc.s3staticsync.main(
-    ...    [os.path.abspath('sample'), 'test/x/', '-iindex', '-llock'])
+    ...    [abspath('sample'), 'test/x/', '-iindex', '-llock'])
 
     >>> os.path.exists('lock')
     True
@@ -321,7 +322,7 @@ If we lock ourselves
 Then we'll get an error is we try to sync:
 
     >>> zc.s3staticsync.main(
-    ...    [os.path.abspath('sample'), 'test/x/', '-iindex', '-llock'])
+    ...    [abspath('sample'), 'test/x/', '-iindex', '-llock'])
     Traceback (most recent call last):
        ...
     LockError: Couldn't lock 'lock'
@@ -329,7 +330,7 @@ Then we'll get an error is we try to sync:
     >>> lock.close()
 
     >>> zc.s3staticsync.main(
-    ...    [os.path.abspath('sample'), 'test/x/', '-iindex', '-llock'])
+    ...    [abspath('sample'), 'test/x/', '-iindex', '-llock'])
 
 S3 Errors
 =========
@@ -348,7 +349,7 @@ When using an index, if there's an error uploading to S3:
     >>> before = now
     >>> bucket.puts = bucket.deletes = bucket.listed = 0
     >>> zc.s3staticsync.main(
-    ...    [os.path.abspath('sample'), 'test/x/', '-iindex', '-llock',
+    ...    [abspath('sample'), 'test/x/', '-iindex', '-llock',
     ...    ]) # doctest: +ELLIPSIS
     uploading 1379924063 ...d1/d2/f1', retrying
     Traceback (most recent call last):
@@ -375,7 +376,7 @@ Later, hopefully, the upload will succeed:
     >>> now += 99
     >>> bucket.puts = bucket.deletes = bucket.listed = 0
     >>> zc.s3staticsync.main(
-    ...    [os.path.abspath('sample'), 'test/x/', '-iindex', '-llock',
+    ...    [abspath('sample'), 'test/x/', '-iindex', '-llock',
     ...    ]) # doctest: +ELLIPSIS
     >>> bucket.listed, bucket.puts, bucket.deletes
     (0, 1, 0)
@@ -391,7 +392,7 @@ Same drill with deletes:
     >>> bucket.puts = bucket.deletes = bucket.listed = 0
     >>> before = now
     >>> zc.s3staticsync.main(
-    ...    [os.path.abspath('sample'), 'test/x/', '-iindex', '-llock',
+    ...    [abspath('sample'), 'test/x/', '-iindex', '-llock',
     ...    ]) # doctest: +ELLIPSIS
     deleting u'x/d1/d2/f1', retrying
     Traceback (most recent call last):
@@ -412,7 +413,7 @@ Same drill with deletes:
 
     >>> bucket.fail = False
     >>> zc.s3staticsync.main(
-    ...    [os.path.abspath('sample'), 'test/x/', '-iindex', '-llock',
+    ...    [abspath('sample'), 'test/x/', '-iindex', '-llock',
     ...    ]) # doctest: +ELLIPSIS
 
 index.html generation
@@ -430,7 +431,7 @@ Now, we'll sync again, but this time, we'll ask (-g) for index.html files
 to be generated:
 
     >>> zc.s3staticsync.main(
-    ...    [os.path.abspath('sample'), 'test/x/', '-iindex', '-llock', '-g'])
+    ...    [abspath('sample'), 'test/x/', '-iindex', '-llock', '-g'])
     >>> now += 3000
 
     >>> for k in bucket:
@@ -466,7 +467,7 @@ If we add a file and a directory to d1/d2, it will be reflected in the index:
     >>> mkfile('sample/d1/d2/d3/f1')
     >>> now += 3000
     >>> zc.s3staticsync.main(
-    ...    [os.path.abspath('sample'), 'test/x/', '-iindex', '-llock', '-g'])
+    ...    [abspath('sample'), 'test/x/', '-iindex', '-llock', '-g'])
 
     >>> for k in bucket:
     ...     print k.key
@@ -507,7 +508,7 @@ If we remove a directory, the generated index file will be removed from s3:
     >>> os.remove('sample/d1/d2/d3/f1')
     >>> os.rmdir('sample/d1/d2/d3')
     >>> zc.s3staticsync.main(
-    ...    [os.path.abspath('sample'), 'test/x/', '-iindex', '-llock', '-g'])
+    ...    [abspath('sample'), 'test/x/', '-iindex', '-llock', '-g'])
 
     >>> for k in bucket:
     ...     print k.key
@@ -525,14 +526,14 @@ We can replace generated indexes:
 
     >>> mkfile('sample/d1/d2/index.html', 'manual index d1/d2')
     >>> zc.s3staticsync.main(
-    ...    [os.path.abspath('sample'), 'test/x/', '-iindex', '-llock', '-g',
+    ...    [abspath('sample'), 'test/x/', '-iindex', '-llock', '-g',
     ...    ]) # doctest: +ELLIPSIS
     >>> print bucket.data['x/d1/d2/index.html'][0],
     manual index d1/d2
 
     >>> os.remove('sample/d1/d2/index.html')
     >>> zc.s3staticsync.main(
-    ...    [os.path.abspath('sample'), 'test/x/', '-iindex', '-llock', '-g',
+    ...    [abspath('sample'), 'test/x/', '-iindex', '-llock', '-g',
     ...    ]) # doctest: +ELLIPSIS
     >>> print bucket.data['x/d1/d2/index.html'][0], # doctest: +ELLIPSIS
     <!-- generated -->
@@ -547,7 +548,7 @@ charges. Let's verify this:
     >>> now += 99
     >>> bucket.puts = bucket.deletes = bucket.listed = 0
     >>> zc.s3staticsync.main(
-    ...    [os.path.abspath('sample'), 'test/x/', '-iindex', '-llock', '-g',
+    ...    [abspath('sample'), 'test/x/', '-iindex', '-llock', '-g',
     ...    ]) # doctest: +ELLIPSIS
     >>> bucket.listed, bucket.puts, bucket.deletes
     (0, 0, 0)
@@ -556,7 +557,7 @@ charges. Let's verify this:
 We can ignore the existing index:
 
     >>> zc.s3staticsync.main(
-    ...    [os.path.abspath('sample'), 'test/x/', '-iindex', '-llock', '-gI'])
+    ...    [abspath('sample'), 'test/x/', '-iindex', '-llock', '-gI'])
 
     >>> for k in bucket:
     ...     print k.key
@@ -582,7 +583,7 @@ We can ignore the existing index:
 Or we can avoid using an index altogether:
 
     >>> zc.s3staticsync.main(
-    ...    [os.path.abspath('sample'), 'test/x/', '-g'])
+    ...    [abspath('sample'), 'test/x/', '-g'])
 
     >>> now += 3000
 
@@ -591,7 +592,7 @@ index to S3:
 
     >>> bucket.puts = bucket.deletes = bucket.listed = 0
     >>> zc.s3staticsync.main(
-    ...    [os.path.abspath('sample'), 'test/x/', '-g'])
+    ...    [abspath('sample'), 'test/x/', '-g'])
     >>> bucket.listed, bucket.puts, bucket.deletes
     ('x/', 1, 0)
 
@@ -600,8 +601,9 @@ we still get the correct behavior:
 
     >>> mkfile('sample/d1/d2/index.html', 'index of d1/d2')
     >>> os.remove('sample/d1/index.html')
+    >>> now += 2000
     >>> zc.s3staticsync.main(
-    ...    [os.path.abspath('sample'), 'test/x/', '-g'])
+    ...    [abspath('sample'), 'test/x/', '-g'])
 
     >>> print bucket.data['x/d1/index.html'][0], # doctest: +ELLIPSIS
     <!-- generated -->
@@ -618,3 +620,52 @@ we still get the correct behavior:
 
     >>> print bucket.data['x/d1/d2/index.html'][0], # doctest: +ELLIPSIS
     index of d1/d2
+
+Cloudfront support
+==================
+
+Typically, an S3 static website will be fronted by cloudfront.
+
+If you use the ``-c`` option to pass a cloudfront distribution, then
+any paths deleted or updated will be invalidated.
+
+    >>> os.remove('index')
+    >>> zc.s3staticsync.main(
+    ...     [abspath('sample'), 'test/x/', '-g', '-iindex', '-c42'])
+    invalidated 42 [u'x/d1/index.html']
+
+Here, we got invalidations for index.html pages.  We got this because,
+without an index, generated html pages are always treated as new.
+
+    >>> zc.s3staticsync.main(
+    ...    [abspath('sample'), 'test/x/', '-g', '-iindex', '-c42'])
+
+Here, we didn't get any invalidations, as expected.
+
+Now, we'll delete, modify, and add a file.
+
+    >>> os.remove('sample/d1/f1')
+    >>> mkfile('sample/d1/f3')
+    >>> mkfile('sample/d1/f4')
+    >>> start = now
+    >>> zc.s3staticsync.main(
+    ...    [abspath('sample'), 'test/x/', '-g', '-iindex', '-c42'])
+    invalidated 42 [u'x/d1/f3', u'x/d1/f1', u'x/d1/index.html']
+
+Note that when we send invalidations, we wait 9 seconds first, to give
+s3 time to sync:
+
+    >>> (now - start) >= 9
+    True
+
+We we see invalidations for the files we deleted and modified, and for
+the index.html file that changed.  We didn't see an invalidation for
+the file we added.
+
+Now, we'll stop generating index.html files:
+
+    >>> zc.s3staticsync.main(
+    ...    [abspath('sample'), 'test/x/', '-iindex', '-c42'])
+    invalidated 42 [u'x/d1/index.html']
+
+And we see an invalidation for the index.html file that's deleted.

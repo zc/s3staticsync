@@ -62,6 +62,8 @@ Note on AWS keys
 Changes
 *******
 
+- Added support for cloudfront invalidations.
+
 1.0.3 (2013-11-28)
 ==================
 
